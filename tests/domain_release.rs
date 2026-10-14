@@ -668,3 +668,12 @@ fn unused_mail_policy_never_overwrites_existing_target_mail() {
     );
     assert_eq!(d.posts + r.puts, 0);
 }
+
+#[test]
+fn plan_digest_has_stable_lowercase_hex_bytes_across_digest_versions() {
+    assert_eq!(
+        zixcel_domain::domain_release::digest(&json!({"fixture":"one-use-plan","revision":1}))
+            .unwrap(),
+        "bc5ba0430d0027e94b5ecbe0354e46d3356f0b074c16c639f9fbbe3cf89b895e"
+    );
+}

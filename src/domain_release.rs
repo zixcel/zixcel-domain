@@ -62,7 +62,10 @@ pub struct Plan {
 }
 pub fn digest(value: &impl Serialize) -> Result<String> {
     let bytes = serde_json::to_vec(value).map_err(|_| error("invalid_plan"))?;
-    Ok(format!("{:x}", Sha256::digest(bytes)))
+    Ok(Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
 }
 fn now() -> Result<u64> {
     SystemTime::now()
