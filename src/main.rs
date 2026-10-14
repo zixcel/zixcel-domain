@@ -15,9 +15,35 @@ fn run(args: &[String]) -> Result<serde_json::Value> {
         }),
         [command] if command == "capabilities" => serde_json::json!({
             "schema_version": 1, "registrar": "valuedomain-v2", "dns": "cloudflare",
-            "operations": ["inventory", "inspect", "mapping-preview", "dns-source-preview", "dns-import-preview", "public-dns", "public-nameservers", "valuedomain-domains", "valuedomain-settings", "cloudflare-zones", "cloudflare-records", "validate-bindings"],
-            "writes_supported": false, "live_acceptance": false
+            "operations": ["inventory", "inspect", "mapping-preview", "dns-source-preview", "dns-import-preview", "public-dns", "public-nameservers", "valuedomain-domains", "valuedomain-settings", "valuedomain-free-dns", "valuedomain-nameservers", "domain-session", "domain-control", "cloudflare-zones", "cloudflare-records", "validate-bindings"],
+            "writes_supported": true, "live_acceptance": false,
+            "write_operations": ["prepare_zone", "change_nameservers"],
+            "write_boundary": "scoped_local_session_one_use_plan_hash_approval"
         }),
+        #[cfg(unix)]
+        [command, socket, domain, account] if command == "domain-session" => {
+            zixcel_domain::domain_session::serve(socket, domain, account)?
+        }
+        #[cfg(unix)]
+        [command, socket, action, argument] if command == "domain-control" => {
+            zixcel_domain::domain_session::control(socket, action, Some(argument))?
+        }
+        #[cfg(unix)]
+        [command, socket, action] if command == "domain-control" => {
+            zixcel_domain::domain_session::control(socket, action, None)?
+        }
+        [command, domain] if command == "valuedomain-nameservers" => {
+            let mut transport =
+                HttpTransport::from_env(Provider::ValueDomain, "VALUEDOMAIN_ACCESS_TOKEN")?;
+            serde_json::to_value(valuedomain::nameservers(&mut transport, domain)?)
+                .map_err(|_| failure())?
+        }
+        [command, domain] if command == "valuedomain-free-dns" => {
+            let mut transport =
+                HttpTransport::from_env(Provider::ValueDomain, "VALUEDOMAIN_ACCESS_TOKEN")?;
+            serde_json::to_value(valuedomain::free_dns(&mut transport, domain)?)
+                .map_err(|_| failure())?
+        }
         [command, domain, record_type] if command == "public-dns" => {
             let mut transport = HttpTransport::public_dns()?;
             serde_json::to_value(public_dns::query(&mut transport, domain, record_type)?)
@@ -157,7 +183,11 @@ fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let (value, code) = match run(&args) {
         Ok(value) => {
-            let code = if value["result"]["complete_for_dns_plan"].as_bool() == Some(false) {
+            let code = if value["result"]["complete_for_dns_plan"].as_bool() == Some(false)
+                || matches!(
+                    value["result"]["status"].as_str(),
+                    Some("rejected" | "partial_or_unknown")
+                ) {
                 2
             } else {
                 0

@@ -37,6 +37,11 @@ pub trait ReadTransport {
     fn get(&mut self, path: &str) -> Result<Value>;
 }
 
+pub trait WriteTransport: ReadTransport {
+    fn post(&mut self, path: &str, body: &Value) -> Result<Value>;
+    fn put(&mut self, path: &str, body: &Value) -> Result<Value>;
+}
+
 pub struct HttpTransport {
     client: Client,
     authorization: Option<HeaderValue>,
@@ -89,12 +94,21 @@ impl HttpTransport {
 }
 impl ReadTransport for HttpTransport {
     fn get(&mut self, path: &str) -> Result<Value> {
-        self.read(path)
+        self.request(reqwest::Method::GET, path, None)
             .map_err(|error| error.with_context(self.provider.name(), "http_get"))
     }
 }
 impl HttpTransport {
-    fn read(&mut self, path: &str) -> Result<Value> {
+    fn request(
+        &mut self,
+        method: reqwest::Method,
+        path: &str,
+        body: Option<&Value>,
+    ) -> Result<Value> {
+        let writing = method != reqwest::Method::GET;
+        if writing && matches!(self.provider, Provider::PublicDns) {
+            return Err(error("public_dns_write_forbidden"));
+        }
         if !path.starts_with('/')
             || path.starts_with("//")
             || path.contains("..")
@@ -113,15 +127,30 @@ impl HttpTransport {
         self.requests_left -= 1;
         let mut request = self
             .client
-            .get(format!("{}{path}", self.provider.base()))
+            .request(method, format!("{}{path}", self.provider.base()))
             .timeout(remaining.min(Duration::from_secs(15)));
+        if let Some(body) = body {
+            let bytes = serde_json::to_vec(body).map_err(|_| error("invalid_write_body"))?;
+            if bytes.len() > 256 * 1024 {
+                return Err(error("write_body_budget"));
+            }
+            request = request
+                .header(reqwest::header::CONTENT_TYPE, "application/json")
+                .body(bytes);
+        }
         if let Some(authorization) = &self.authorization {
             request = request.header(AUTHORIZATION, authorization.clone());
         }
         if matches!(self.provider, Provider::PublicDns) {
             request = request.header(reqwest::header::ACCEPT, "application/dns-json");
         }
-        let response = request.send().map_err(|_| error("transport_failed"))?;
+        let response = request.send().map_err(|_| {
+            error(if writing {
+                "write_outcome_unknown"
+            } else {
+                "transport_failed"
+            })
+        })?;
         if !response.status().is_success() {
             return Err(error(match response.status().as_u16() {
                 401 => "unauthorized",
@@ -142,5 +171,16 @@ impl HttpTransport {
         }
         self.bytes_left -= bytes.len();
         serde_json::from_slice(&bytes).map_err(|_| error("invalid_provider_json"))
+    }
+}
+
+impl WriteTransport for HttpTransport {
+    fn post(&mut self, path: &str, body: &Value) -> Result<Value> {
+        self.request(reqwest::Method::POST, path, Some(body))
+            .map_err(|error| error.with_context(self.provider.name(), "http_post"))
+    }
+    fn put(&mut self, path: &str, body: &Value) -> Result<Value> {
+        self.request(reqwest::Method::PUT, path, Some(body))
+            .map_err(|error| error.with_context(self.provider.name(), "http_put"))
     }
 }

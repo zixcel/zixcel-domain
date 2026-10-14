@@ -1,0 +1,293 @@
+use serde_json::{Value, json};
+use zixcel_domain::{
+    Error, Result,
+    domain_release::{Session, source},
+    transport::{ReadTransport, WriteTransport},
+    valuedomain,
+};
+const ACCOUNT: &str = "00000000000000000000000000000001";
+const ZONE: &str = "00000000000000000000000000000002";
+struct Registrar {
+    ns: Vec<String>,
+    records: String,
+    puts: usize,
+}
+impl Registrar {
+    fn new() -> Self {
+        Self {
+            ns: vec![
+                "ns11.value-domain.com".into(),
+                "ns12.value-domain.com".into(),
+            ],
+            records: "a @ 203.0.113.1\nmx mail.example.test 10\ntxt @ \"v=spf1 -all\"".into(),
+            puts: 0,
+        }
+    }
+}
+impl ReadTransport for Registrar {
+    fn get(&mut self, path: &str) -> Result<Value> {
+        match path {
+            "/domains?limit=50&page=1" => Ok(
+                json!({"paging":{"max":1,"limit":50,"page":1},"results":[{"domainname":"example.test"}]}),
+            ),
+            "/domains/example.test/nameserver" => {
+                Ok(json!({"results":{"domainname":"example.test","ns":self.ns}}))
+            }
+            "/freedns/example.test" => Ok(
+                json!({"results":{"domainname":"example.test","records":self.records,"ttl":"3600"}}),
+            ),
+            _ => Err(Error::new("unexpected_fixture_request")),
+        }
+    }
+}
+impl WriteTransport for Registrar {
+    fn post(&mut self, _: &str, _: &Value) -> Result<Value> {
+        panic!("unexpected registrar POST")
+    }
+    fn put(&mut self, path: &str, body: &Value) -> Result<Value> {
+        assert_eq!(path, "/domains/example.test/nameserver");
+        self.puts += 1;
+        self.ns = body["ns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_owned())
+            .collect();
+        Ok(json!({"results":{"domainname":"example.test","ns":self.ns}}))
+    }
+}
+struct Dns {
+    present: bool,
+    records: Vec<Value>,
+    posts: usize,
+    fail_record: bool,
+}
+impl Dns {
+    fn new() -> Self {
+        Self {
+            present: false,
+            records: vec![],
+            posts: 0,
+            fail_record: false,
+        }
+    }
+}
+impl ReadTransport for Dns {
+    fn get(&mut self, path: &str) -> Result<Value> {
+        if path.starts_with("/zones?") {
+            assert!(path.contains(ACCOUNT));
+            let records = if self.present {
+                vec![
+                    json!({"id":ZONE,"account":{"id":ACCOUNT},"name":"example.test","status":"pending","name_servers":["arya.ns.cloudflare.com","david.ns.cloudflare.com"]}),
+                ]
+            } else {
+                vec![]
+            };
+            Ok(
+                json!({"success":true,"result_info":{"page":1,"total_count":records.len()},"result":records}),
+            )
+        } else if path.starts_with(&format!("/zones/{ZONE}/dns_records?")) {
+            Ok(
+                json!({"success":true,"result_info":{"page":1,"total_count":self.records.len()},"result":self.records}),
+            )
+        } else {
+            Err(Error::new("unexpected_fixture_request"))
+        }
+    }
+}
+impl WriteTransport for Dns {
+    fn post(&mut self, path: &str, body: &Value) -> Result<Value> {
+        self.posts += 1;
+        if path == "/zones" {
+            self.present = true;
+            Ok(json!({"success":true,"result":{"name":"example.test","account":{"id":ACCOUNT}}}))
+        } else {
+            assert_eq!(path, format!("/zones/{ZONE}/dns_records"));
+            if self.fail_record {
+                return Err(Error::new("write_outcome_unknown"));
+            }
+            let mut record = body.clone();
+            record["id"] = json!(format!("{:032x}", self.records.len() + 10));
+            self.records.push(record.clone());
+            Ok(json!({"success":true,"result":record}))
+        }
+    }
+    fn put(&mut self, _: &str, _: &Value) -> Result<Value> {
+        panic!("no record overwrites allowed")
+    }
+}
+struct Public {
+    ds: bool,
+}
+impl ReadTransport for Public {
+    fn get(&mut self, path: &str) -> Result<Value> {
+        let kind = path.rsplit('=').next().unwrap();
+        let (number, data) = match kind {
+            "NS" => (2, vec!["ns1.value-domain.com."]),
+            "SOA" => (
+                6,
+                vec!["ns1.value-domain.com. hostmaster.example.test. 1 3600 900 604800 3600"],
+            ),
+            "DS" => (
+                43,
+                if self.ds {
+                    vec!["1 1 1 deadbeef"]
+                } else {
+                    vec![]
+                },
+            ),
+            "MX" => (15, vec!["10 mail.example.test."]),
+            "TXT" => (16, vec!["\"v=spf1 -all\""]),
+            _ => panic!("unknown query"),
+        };
+        Ok(
+            json!({"Status":0,"TC":false,"Question":[{"name":"example.test.","type":number}],"Answer":data.into_iter().map(|s|json!({"name":"example.test.","type":number,"TTL":3600,"data":s})).collect::<Vec<_>>()}),
+        )
+    }
+}
+fn planned(
+    session: &mut Session,
+    phase: &str,
+    r: &mut Registrar,
+    d: &mut Dns,
+    p: &mut Public,
+) -> String {
+    session.plan(phase, r, d, p).unwrap()["sha256"]
+        .as_str()
+        .unwrap()
+        .into()
+}
+#[test]
+fn free_dns_uses_authoritative_service_and_accepts_documented_string_ttl() {
+    let mut r = Registrar::new();
+    let mut p = Public { ds: false };
+    let s = source(&mut r, &mut p, "example.test").unwrap();
+    assert_eq!(s.dns_service, "valuedomain1");
+    assert_eq!(s.ttl, 3600);
+    assert_ne!(s.public_nameservers, s.registrar_nameservers);
+    assert_eq!(
+        valuedomain::free_dns(&mut r, "example.test")
+            .unwrap()
+            .ns_type,
+        "valuedomain1"
+    );
+}
+#[test]
+fn plans_preserve_mail_exclude_web_apex_and_bind_one_use_approval() {
+    let (mut r, mut d, mut p) = (Registrar::new(), Dns::new(), Public { ds: false });
+    let mut s = Session::new("example.test", ACCOUNT).unwrap();
+    let hash = planned(&mut s, "prepare_zone", &mut r, &mut d, &mut p);
+    let receipt = s.apply(&hash, &mut r, &mut d, &mut p).unwrap();
+    assert_eq!(receipt["status"], "provider_verified");
+    assert_eq!(d.records.len(), 2);
+    assert_eq!(d.posts, 3);
+    assert_eq!(r.puts, 0);
+    assert!(d.records.iter().all(|r| r["type"] != "A"));
+    assert_eq!(
+        s.apply(&hash, &mut r, &mut d, &mut p).unwrap_err().code,
+        "unissued_or_consumed_plan"
+    );
+    assert_eq!(d.posts, 3);
+    assert_eq!(
+        s.apply(&"f".repeat(64), &mut r, &mut d, &mut p)
+            .unwrap_err()
+            .code,
+        "unissued_or_consumed_plan"
+    );
+    let mut other = Session::new("example.test", ACCOUNT).unwrap();
+    assert_eq!(
+        other.apply(&hash, &mut r, &mut d, &mut p).unwrap_err().code,
+        "unissued_or_consumed_plan"
+    );
+}
+#[test]
+fn snapshot_drift_consumes_approval_without_writes() {
+    let (mut r, mut d, mut p) = (Registrar::new(), Dns::new(), Public { ds: false });
+    let mut s = Session::new("example.test", ACCOUNT).unwrap();
+    let hash = planned(&mut s, "prepare_zone", &mut r, &mut d, &mut p);
+    r.records.push_str("\ntxt extra \"changed\"");
+    assert_eq!(
+        s.apply(&hash, &mut r, &mut d, &mut p).unwrap_err().code,
+        "snapshot_drift"
+    );
+    assert_eq!(d.posts, 0);
+    assert_eq!(r.puts, 0);
+}
+#[test]
+fn uncertain_record_write_is_not_retried_or_reported_applied() {
+    let (mut r, mut d, mut p) = (Registrar::new(), Dns::new(), Public { ds: false });
+    let mut s = Session::new("example.test", ACCOUNT).unwrap();
+    let hash = planned(&mut s, "prepare_zone", &mut r, &mut d, &mut p);
+    d.fail_record = true;
+    let result = s.apply(&hash, &mut r, &mut d, &mut p).unwrap();
+    assert_eq!(result["status"], "partial_or_unknown");
+    assert_eq!(d.posts, 2);
+    assert_eq!(r.puts, 0);
+    assert_eq!(
+        s.apply(&hash, &mut r, &mut d, &mut p).unwrap_err().code,
+        "unissued_or_consumed_plan"
+    );
+    assert_eq!(d.posts, 2);
+}
+#[test]
+fn nameserver_switch_requires_verified_copy_and_absent_ds() {
+    let (mut r, mut d, mut p) = (Registrar::new(), Dns::new(), Public { ds: false });
+    let mut s = Session::new("example.test", ACCOUNT).unwrap();
+    assert_eq!(
+        s.plan("change_nameservers", &mut r, &mut d, &mut p)
+            .unwrap_err()
+            .code,
+        "zone_not_prepared"
+    );
+    let hash = planned(&mut s, "prepare_zone", &mut r, &mut d, &mut p);
+    s.apply(&hash, &mut r, &mut d, &mut p).unwrap();
+    p.ds = true;
+    assert_eq!(
+        s.plan("change_nameservers", &mut r, &mut d, &mut p)
+            .unwrap_err()
+            .code,
+        "dnssec_transition_required"
+    );
+    assert_eq!(r.puts, 0);
+    p.ds = false;
+    let hash = planned(&mut s, "change_nameservers", &mut r, &mut d, &mut p);
+    let result = s.apply(&hash, &mut r, &mut d, &mut p).unwrap();
+    assert_eq!(r.puts, 1);
+    assert_eq!(result["status"], "provider_verified");
+    assert_eq!(
+        result["result"]["public_propagation"],
+        "pending_separate_verification"
+    );
+    let hash = planned(&mut s, "change_nameservers", &mut r, &mut d, &mut p);
+    s.apply(&hash, &mut r, &mut d, &mut p).unwrap();
+    assert_eq!(r.puts, 1);
+}
+#[test]
+fn self_targeted_mail_and_incompatible_records_are_rejected() {
+    let (mut r, mut d, mut p) = (Registrar::new(), Dns::new(), Public { ds: false });
+    let mut s = Session::new("example.test", ACCOUNT).unwrap();
+    r.records = "a @ 203.0.113.1\nmx @ 10".into();
+    assert_eq!(
+        s.plan("prepare_zone", &mut r, &mut d, &mut p)
+            .unwrap_err()
+            .code,
+        "mail_depends_on_web_apex"
+    );
+    assert_eq!(d.posts, 0);
+}
+
+#[test]
+fn public_mail_records_missing_from_export_block_zone_preparation() {
+    let (mut registrar, mut dns, mut public) = (Registrar::new(), Dns::new(), Public { ds: false });
+    registrar.records = "a @ 203.0.113.1\ntxt @ \"v=spf1 -all\"".into();
+    let mut session = Session::new("example.test", ACCOUNT).unwrap();
+    assert_eq!(
+        session
+            .plan("prepare_zone", &mut registrar, &mut dns, &mut public)
+            .unwrap_err()
+            .code,
+        "public_mail_export_mismatch"
+    );
+    assert_eq!(dns.posts, 0);
+    assert_eq!(registrar.puts, 0);
+}
