@@ -406,3 +406,23 @@ fn filtered_inventory_excludes_disabled_and_never_returns_partial_results() {
         "wrong_domain"
     );
 }
+
+#[test]
+fn http_failure_retains_safe_status_through_operation_context() {
+    let error = Error::new("provider_failed")
+        .with_http_status(404)
+        .with_context("valuedomain-v2", "request")
+        .for_operation("read_free_dns");
+    let value = serde_json::to_value(error).unwrap();
+    assert_eq!(
+        value,
+        serde_json::json!({"code":"provider_failed", "http_status":404,
+        "provider":"valuedomain-v2", "operation":"read_free_dns"})
+    );
+    assert!(
+        serde_json::to_value(Error::new("credential_missing"))
+            .unwrap()
+            .get("http_status")
+            .is_none()
+    );
+}

@@ -22,6 +22,8 @@ pub struct Error {
     pub provider: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operation: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub http_status: Option<u16>,
 }
 impl Error {
     pub fn new(code: &'static str) -> Self {
@@ -29,6 +31,7 @@ impl Error {
             code,
             provider: None,
             operation: None,
+            http_status: None,
         }
     }
     pub fn with_context(mut self, provider: &'static str, operation: &'static str) -> Self {
@@ -38,6 +41,10 @@ impl Error {
     }
     pub fn for_operation(mut self, operation: &'static str) -> Self {
         self.operation = Some(operation);
+        self
+    }
+    pub fn with_http_status(mut self, status: u16) -> Self {
+        self.http_status = Some(status);
         self
     }
 }
