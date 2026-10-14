@@ -101,6 +101,16 @@ fn run(args: &[String]) -> Result<serde_json::Value> {
             serde_json::json!({"registrar_domains": domains, "cloudflare_zones": zones,
                 "organization_binding": "explicit_manifest_required", "writes_performed": false})
         }
+        [command, flag]
+            if command == "valuedomain-domains" && flag == "--exclude-auto-renew-disabled" =>
+        {
+            let mut transport =
+                HttpTransport::from_env(Provider::ValueDomain, "VALUEDOMAIN_ACCESS_TOKEN")?;
+            serde_json::to_value(valuedomain::domains_excluding_auto_renew_disabled(
+                &mut transport,
+            )?)
+            .map_err(|_| failure())?
+        }
         [command] if command == "valuedomain-domains" => {
             let mut transport =
                 HttpTransport::from_env(Provider::ValueDomain, "VALUEDOMAIN_ACCESS_TOKEN")?;

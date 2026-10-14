@@ -59,6 +59,38 @@ pub fn domains(transport: &mut impl ReadTransport) -> Result<Vec<Domain>> {
     Err(error("page_budget"))
 }
 
+/// Exclude domains whose effective renewal is disabled. Individual settings
+/// override account settings; unknown/missing values fail instead of guessing.
+pub fn domains_excluding_auto_renew_disabled(
+    transport: &mut impl ReadTransport,
+) -> Result<Vec<Domain>> {
+    let inventory = domains(transport)?;
+    let mut retained = Vec::new();
+    for domain in inventory {
+        let response = transport
+            .get(&format!("/domains/{}/autorenew", domain.domain))
+            .map_err(|error| error.for_operation("read_auto_renew"))?;
+        verify_domain(&response, &domain.domain)?;
+        if effective_auto_renew(&response["results"])? {
+            retained.push(domain);
+        }
+    }
+    Ok(retained)
+}
+
+pub fn effective_auto_renew(settings: &serde_json::Value) -> Result<bool> {
+    match settings["autorenew_domain"].as_u64() {
+        Some(9) => Ok(false),
+        Some(10) => Ok(true),
+        Some(0) => match settings["autorenew_all"].as_u64() {
+            Some(0 | 9) => Ok(false),
+            Some(10 | 11) => Ok(true),
+            _ => Err(error("invalid_auto_renew")),
+        },
+        _ => Err(error("invalid_auto_renew")),
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct DomainSettings {
     pub domain: String,
