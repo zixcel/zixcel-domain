@@ -49,6 +49,14 @@ impl Drop for SocketGuard<'_> {
     }
 }
 pub fn serve(path: &str, domain: &str, account: &str) -> Result<Value> {
+    serve_with_policy(path, domain, account, false)
+}
+pub fn serve_with_policy(
+    path: &str,
+    domain: &str,
+    account: &str,
+    allow_empty: bool,
+) -> Result<Value> {
     let path = Path::new(path);
     let parent = path.parent().ok_or_else(|| error("invalid_socket_path"))?;
     let meta = std::fs::symlink_metadata(parent)
@@ -57,6 +65,9 @@ pub fn serve(path: &str, domain: &str, account: &str) -> Result<Value> {
         return Err(error("private_socket_directory_required"));
     }
     let mut session = Session::new(domain, account)?;
+    if allow_empty {
+        session = session.allow_empty_registered_unserved();
+    }
     let listener = UnixListener::bind(path).map_err(|_| error("socket_bind_failed"))?;
     let inode = std::fs::symlink_metadata(path)
         .map_err(|_| error("socket_setup_failed"))?

@@ -5,6 +5,7 @@ pub mod dns_import;
 pub mod domain_release;
 #[cfg(unix)]
 pub mod domain_session;
+mod empty_registered_source;
 pub mod inspection;
 pub mod mapping;
 pub mod public_dns;
