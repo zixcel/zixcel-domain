@@ -406,6 +406,7 @@ fn parent_delegation_drift_consumes_plan_before_cloudflare_writes() {
 }
 
 struct UnservedPublic {
+    legacy: bool,
     ds: bool,
     mixed: bool,
 }
@@ -413,6 +414,9 @@ impl ReadTransport for UnservedPublic {
     fn delegation(&mut self, _: &str) -> Result<Vec<String>> {
         if self.mixed {
             return Ok(vec!["ns11.value-domain.com".into(), "outside.test".into()]);
+        }
+        if self.legacy {
+            return Ok((1..=5).map(|n| format!("ns{n}.value-domain.com")).collect());
         }
         Ok([11, 12, 13]
             .map(|n| format!("ns{n}.value-domain.com"))
@@ -443,6 +447,7 @@ fn empty_fixture() -> (Registrar, Dns, UnservedPublic) {
         registrar,
         Dns::new(),
         UnservedPublic {
+            legacy: false,
             ds: false,
             mixed: false,
         },
@@ -545,4 +550,121 @@ fn empty_source_drift_consumes_plan_without_writes() {
             .code,
         "unissued_or_consumed_plan"
     );
+}
+
+#[test]
+fn empty_valuedomain1_requires_matching_full_delegation_and_stored_service() {
+    for mismatch in [false, true] {
+        let (mut r, mut d, mut p) = empty_fixture();
+        r.ns = (1..=5).map(|n| format!("ns{n}.value-domain.com")).collect();
+        p.legacy = true;
+        r.dns_type = if mismatch {
+            "valuedomain11"
+        } else {
+            "valuedomain1"
+        }
+        .into();
+        let mut session = Session::new("example.test", ACCOUNT)
+            .unwrap()
+            .allow_empty_registered_unserved();
+        let plan = session.plan("prepare_zone", &mut r, &mut d, &mut p);
+        if mismatch {
+            assert!(plan.is_err());
+            assert_eq!(d.posts + r.puts, 0);
+        } else {
+            let plan = plan.unwrap();
+            assert_eq!(plan["plan"]["source"]["dns_service"], "valuedomain1");
+            assert_eq!(
+                session
+                    .apply(plan["sha256"].as_str().unwrap(), &mut r, &mut d, &mut p)
+                    .unwrap()["status"],
+                "provider_verified"
+            );
+        }
+    }
+}
+
+#[test]
+fn unused_mail_retirement_is_explicit_and_preserves_unrelated_records() {
+    let mut r = Registrar::new();
+    r.records.push_str(
+        "\nmx example.test 10\na keep 203.0.113.2\ntxt @ \"unrelated-verification=fixture\"",
+    );
+    let mut d = Dns::new();
+    let mut p = Public {
+        ds: false,
+        delegated_11: false,
+    };
+    let mut default = Session::new("example.test", ACCOUNT).unwrap();
+    assert_eq!(
+        default
+            .plan("prepare_zone", &mut r, &mut d, &mut p)
+            .unwrap_err()
+            .code,
+        "mail_depends_on_web_apex"
+    );
+    let mut opted = Session::new("example.test", ACCOUNT)
+        .unwrap()
+        .retire_unused_mail();
+    let plan = opted.plan("prepare_zone", &mut r, &mut d, &mut p).unwrap();
+    assert_eq!(plan["plan"]["retire_unused_mail"], true);
+    assert_eq!(
+        plan["plan"]["records_to_retire"].as_array().unwrap().len(),
+        3
+    );
+    assert_eq!(
+        plan["plan"]["records_to_preserve"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(plan["plan"]["records_to_add"].as_array().unwrap().len(), 3);
+    assert_eq!(
+        opted
+            .apply(plan["sha256"].as_str().unwrap(), &mut r, &mut d, &mut p)
+            .unwrap()["status"],
+        "provider_verified"
+    );
+    assert!(
+        d.records
+            .iter()
+            .any(|r| r["type"] == "MX" && r["content"] == "." && r["priority"] == 0)
+    );
+    assert!(d.records.iter().any(|r| r["content"] == "\"v=spf1 -all\""));
+    assert!(
+        !d.records
+            .iter()
+            .any(|r| r["type"] == "MX" && r["content"] != ".")
+    );
+    let plan = opted
+        .plan("change_nameservers", &mut r, &mut d, &mut p)
+        .unwrap();
+    assert_eq!(
+        opted
+            .apply(plan["sha256"].as_str().unwrap(), &mut r, &mut d, &mut p)
+            .unwrap()["status"],
+        "provider_verified"
+    );
+}
+#[test]
+fn unused_mail_policy_never_overwrites_existing_target_mail() {
+    let mut r = Registrar::new();
+    let mut d = Dns::new();
+    d.present = true;
+    d.records.push(json!({"id":ZONE,"type":"MX","name":"example.test","content":"existing.test","priority":10,"ttl":3600,"proxied":false}));
+    let mut p = Public {
+        ds: false,
+        delegated_11: false,
+    };
+    let mut s = Session::new("example.test", ACCOUNT)
+        .unwrap()
+        .retire_unused_mail();
+    assert_eq!(
+        s.plan("prepare_zone", &mut r, &mut d, &mut p)
+            .unwrap_err()
+            .code,
+        "target_mail_retirement_requires_review"
+    );
+    assert_eq!(d.posts + r.puts, 0);
 }
