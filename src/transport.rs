@@ -158,7 +158,8 @@ impl HttpTransport {
                 429 => "rate_limited",
                 300..=399 => "redirect_refused",
                 _ => "provider_failed",
-            }));
+            })
+            .with_http_status(response.status().as_u16()));
         }
         let limit = self.bytes_left.min(1024 * 1024);
         let mut bytes = Vec::new();
