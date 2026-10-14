@@ -235,3 +235,25 @@ expiry or failure stops the batch. An optional
 `--allow-empty-registered-unserved` before the domain list explicitly selects the
 empty-domain policy. It does not auto-apply plans or bypass hash, DNSSEC, source,
 account or target-zone checks. Each session keeps the original 20-minute limit.
+
+
+### Explicit retirement of unused mail
+
+Mail remains preserved by default. Only after the owner confirms that mail is
+unused, start a scoped session with `--retire-unused-mail`. The plan includes
+`retire_unused_mail`, exact `records_to_retire`, retained records and
+`records_to_add` in its one-use hash. MX and mail authentication records
+(SPF/DKIM/DMARC/MTA-STS declarations) are omitted from the new zone; unrelated
+verification TXT, addresses and other supported records remain. The new zone
+receives an apex Null MX, SPF `-all` and DMARC reject declaration. Existing target
+mail is never overwritten or deleted: conflicting target mail requires a separate
+review. Original registrar settings remain in the private source snapshot for
+rollback; the effective retirement occurs when delegation switches to Cloudflare.
+Public/source consistency, DNSSEC and drift/replay checks remain mandatory.
+
+For an explicitly selected subset of a batch, use
+`--retire-unused-mail=incus.jp,ihat.online` before the domain list. Every retirement
+domain must be in that list; other selected domains retain the preserve policy.
+This option can be combined with `--allow-empty-registered-unserved`. Version
+0.4.0 adds these policy/plan fields; no previous issued plan is accepted by a new
+session.

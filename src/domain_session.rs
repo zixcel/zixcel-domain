@@ -57,6 +57,15 @@ pub fn serve_with_policy(
     account: &str,
     allow_empty: bool,
 ) -> Result<Value> {
+    serve_with_policies(path, domain, account, allow_empty, false)
+}
+pub fn serve_with_policies(
+    path: &str,
+    domain: &str,
+    account: &str,
+    allow_empty: bool,
+    retire_mail: bool,
+) -> Result<Value> {
     let path = Path::new(path);
     let parent = path.parent().ok_or_else(|| error("invalid_socket_path"))?;
     let meta = std::fs::symlink_metadata(parent)
@@ -67,6 +76,9 @@ pub fn serve_with_policy(
     let mut session = Session::new(domain, account)?;
     if allow_empty {
         session = session.allow_empty_registered_unserved();
+    }
+    if retire_mail {
+        session = session.retire_unused_mail();
     }
     let listener = UnixListener::bind(path).map_err(|_| error("socket_bind_failed"))?;
     let inode = std::fs::symlink_metadata(path)

@@ -21,14 +21,27 @@ fn run(args: &[String]) -> Result<serde_json::Value> {
             "write_boundary": "scoped_local_session_one_use_plan_hash_approval"
         }),
         #[cfg(unix)]
-        [command, socket, domain, account, flag]
-            if command == "domain-session" && flag == "--allow-empty-registered-unserved" =>
-        {
-            zixcel_domain::domain_session::serve_with_policy(socket, domain, account, true)?
-        }
-        #[cfg(unix)]
-        [command, socket, domain, account] if command == "domain-session" => {
-            zixcel_domain::domain_session::serve(socket, domain, account)?
+        [command, socket, domain, account, flags @ ..] if command == "domain-session" => {
+            if flags.len() > 2
+                || flags.iter().any(|flag| {
+                    !matches!(
+                        flag.as_str(),
+                        "--allow-empty-registered-unserved" | "--retire-unused-mail"
+                    )
+                })
+                || (flags.len() == 2 && flags[0] == flags[1])
+            {
+                return Err(zixcel_domain::Error::new("invalid_session_policy"));
+            }
+            zixcel_domain::domain_session::serve_with_policies(
+                socket,
+                domain,
+                account,
+                flags
+                    .iter()
+                    .any(|f| f == "--allow-empty-registered-unserved"),
+                flags.iter().any(|f| f == "--retire-unused-mail"),
+            )?
         }
         #[cfg(unix)]
         [command, socket, action, argument] if command == "domain-control" => {
