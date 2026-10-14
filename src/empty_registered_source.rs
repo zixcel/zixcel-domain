@@ -25,16 +25,29 @@ pub(crate) fn source(
     let mut parent_ns = public.delegation(&domain)?;
     parent_ns.sort();
     parent_ns.dedup();
-    let expected = [
-        "ns11.value-domain.com",
-        "ns12.value-domain.com",
-        "ns13.value-domain.com",
-    ];
-    if registrar_ns != parent_ns || parent_ns != expected {
+    if registrar_ns != parent_ns {
         return Err(error("empty_source_delegation_mismatch"));
     }
     let stored = valuedomain::stored_dns(registrar, &domain)?;
-    if stored.ns_type != "valuedomain11" || !stored.records.trim().is_empty() {
+    let expected: &[&str] = match stored.ns_type.as_str() {
+        "valuedomain11" => &[
+            "ns11.value-domain.com",
+            "ns12.value-domain.com",
+            "ns13.value-domain.com",
+        ],
+        "valuedomain1" => &[
+            "ns1.value-domain.com",
+            "ns2.value-domain.com",
+            "ns3.value-domain.com",
+            "ns4.value-domain.com",
+            "ns5.value-domain.com",
+        ],
+        _ => return Err(error("empty_registered_source_required")),
+    };
+    if parent_ns != expected {
+        return Err(error("empty_source_delegation_mismatch"));
+    }
+    if !stored.records.trim().is_empty() {
         return Err(error("empty_registered_source_required"));
     }
     // A SERVFAIL is not an empty export. This mode uses the owner's empty

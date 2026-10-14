@@ -406,6 +406,7 @@ fn parent_delegation_drift_consumes_plan_before_cloudflare_writes() {
 }
 
 struct UnservedPublic {
+    legacy: bool,
     ds: bool,
     mixed: bool,
 }
@@ -413,6 +414,9 @@ impl ReadTransport for UnservedPublic {
     fn delegation(&mut self, _: &str) -> Result<Vec<String>> {
         if self.mixed {
             return Ok(vec!["ns11.value-domain.com".into(), "outside.test".into()]);
+        }
+        if self.legacy {
+            return Ok((1..=5).map(|n| format!("ns{n}.value-domain.com")).collect());
         }
         Ok([11, 12, 13]
             .map(|n| format!("ns{n}.value-domain.com"))
@@ -443,6 +447,7 @@ fn empty_fixture() -> (Registrar, Dns, UnservedPublic) {
         registrar,
         Dns::new(),
         UnservedPublic {
+            legacy: false,
             ds: false,
             mixed: false,
         },
@@ -545,4 +550,36 @@ fn empty_source_drift_consumes_plan_without_writes() {
             .code,
         "unissued_or_consumed_plan"
     );
+}
+
+#[test]
+fn empty_valuedomain1_requires_matching_full_delegation_and_stored_service() {
+    for mismatch in [false, true] {
+        let (mut r, mut d, mut p) = empty_fixture();
+        r.ns = (1..=5).map(|n| format!("ns{n}.value-domain.com")).collect();
+        p.legacy = true;
+        r.dns_type = if mismatch {
+            "valuedomain11"
+        } else {
+            "valuedomain1"
+        }
+        .into();
+        let mut session = Session::new("example.test", ACCOUNT)
+            .unwrap()
+            .allow_empty_registered_unserved();
+        let plan = session.plan("prepare_zone", &mut r, &mut d, &mut p);
+        if mismatch {
+            assert!(plan.is_err());
+            assert_eq!(d.posts + r.puts, 0);
+        } else {
+            let plan = plan.unwrap();
+            assert_eq!(plan["plan"]["source"]["dns_service"], "valuedomain1");
+            assert_eq!(
+                session
+                    .apply(plan["sha256"].as_str().unwrap(), &mut r, &mut d, &mut p)
+                    .unwrap()["status"],
+                "provider_verified"
+            );
+        }
+    }
 }
