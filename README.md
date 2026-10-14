@@ -146,3 +146,20 @@ endpoint/authentication/pagination facts; no provider implementation was copied.
 recursive resolver. It distinguishes failed DNS answers from successful NODATA
 and always reports `zone_inventory_complete: false`. Apex queries cannot enumerate
 all subdomains or establish which administrative system holds the full zone.
+
+### Exclude domains with automatic renewal disabled
+
+```sh
+bash playground/list-domains-local.sh --exclude-auto-renew-disabled
+# Or, with the existing credential supplied through the environment:
+zixcel-domain valuedomain-domains --exclude-auto-renew-disabled
+```
+
+The helper saves the filtered result separately to
+`.local/valuedomain-domains-auto-renew.json`, preserving the full inventory.
+The CLI reads each domain's effective setting through VDAPI v2: individual
+`9` disables renewal, `10` enables it, and `0` inherits the account setting
+(`0`/`9` disabled, `10`/`11` enabled). Missing or unknown values, wrong domains,
+partial responses and request budget exhaustion fail without returning a
+partial filtered list. This flag reads settings; it never changes them.
+Contract: https://one.value-domain.com/doc/api/v2/domain/spec.yaml

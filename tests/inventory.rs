@@ -330,3 +330,79 @@ fn assigned_cloudflare_dns_does_not_request_unused_registrar_storage() {
         "dns_hosted_on_cloudflare"
     );
 }
+
+#[test]
+fn auto_renew_individual_override_and_account_inheritance() {
+    for account in [0, 9, 10, 11] {
+        for individual in [0, 9, 10] {
+            let expected = individual == 10 || (individual == 0 && account >= 10);
+            assert_eq!(
+                valuedomain::effective_auto_renew(&json!({
+                    "autorenew_all": account, "autorenew_domain": individual
+                }))
+                .unwrap(),
+                expected
+            );
+        }
+    }
+    for invalid in [
+        json!({}),
+        json!({"autorenew_domain": 0}),
+        json!({"autorenew_domain": 0, "autorenew_all": 1}),
+        json!({"autorenew_domain": 1, "autorenew_all": 10}),
+        json!({"autorenew_domain": "10"}),
+    ] {
+        assert_eq!(
+            valuedomain::effective_auto_renew(&invalid)
+                .unwrap_err()
+                .code,
+            "invalid_auto_renew"
+        );
+    }
+}
+
+#[test]
+fn filtered_inventory_excludes_disabled_and_never_returns_partial_results() {
+    let page = vd_page(
+        1,
+        2,
+        vec![
+            json!({"domainname":"off.test"}),
+            json!({"domainname":"on.test"}),
+        ],
+    );
+    let off = json!({"results":{"domainname":"off.test", "autorenew_domain":9,"autorenew_all":10}});
+    let on = json!({"results":{"domainname":"on.test", "autorenew_domain":0,"autorenew_all":11}});
+    let mut transport = fixture(vec![
+        ("/domains?limit=50&page=1", Ok(page.clone())),
+        ("/domains/off.test/autorenew", Ok(off.clone())),
+        ("/domains/on.test/autorenew", Ok(on)),
+    ]);
+    let domains = valuedomain::domains_excluding_auto_renew_disabled(&mut transport).unwrap();
+    assert_eq!(domains.len(), 1);
+    assert_eq!(domains[0].domain, "on.test");
+    let mut partial = fixture(vec![
+        ("/domains?limit=50&page=1", Ok(page.clone())),
+        ("/domains/off.test/autorenew", Ok(off.clone())),
+        ("/domains/on.test/autorenew", Err(Error::new("forbidden"))),
+    ]);
+    assert_eq!(
+        valuedomain::domains_excluding_auto_renew_disabled(&mut partial)
+            .unwrap_err()
+            .code,
+        "forbidden"
+    );
+    let mut wrong = fixture(vec![
+        ("/domains?limit=50&page=1", Ok(page)),
+        (
+            "/domains/off.test/autorenew",
+            Ok(json!({"results":{"domainname":"other.test", "autorenew_domain":10}})),
+        ),
+    ]);
+    assert_eq!(
+        valuedomain::domains_excluding_auto_renew_disabled(&mut wrong)
+            .unwrap_err()
+            .code,
+        "wrong_domain"
+    );
+}
