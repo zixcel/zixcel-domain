@@ -1,0 +1,164 @@
+use std::io::{Read, Write};
+use zixcel_domain::public_dns;
+use zixcel_domain::{
+    DomainBinding, Result, cloudflare, dns_import, inspection, mapping,
+    transport::{HttpTransport, Provider},
+    validate_bindings, valuedomain,
+};
+
+fn run(args: &[String]) -> Result<serde_json::Value> {
+    let failure = || zixcel_domain::Error::new("invalid_command");
+    let value = match args {
+        [command] if command == "version" || command == "--version" => serde_json::json!({
+            "version":env!("CARGO_PKG_VERSION"),
+            "source_sha":option_env!("ZIXCEL_DOMAIN_SOURCE_SHA"),
+        }),
+        [command] if command == "capabilities" => serde_json::json!({
+            "schema_version": 1, "registrar": "valuedomain-v2", "dns": "cloudflare",
+            "operations": ["inventory", "inspect", "mapping-preview", "dns-source-preview", "dns-import-preview", "public-dns", "public-nameservers", "valuedomain-domains", "valuedomain-settings", "cloudflare-zones", "cloudflare-records", "validate-bindings"],
+            "writes_supported": false, "live_acceptance": false
+        }),
+        [command, domain, record_type] if command == "public-dns" => {
+            let mut transport = HttpTransport::public_dns()?;
+            serde_json::to_value(public_dns::query(&mut transport, domain, record_type)?)
+                .map_err(|_| failure())?
+        }
+        [command] if command == "dns-source-preview" => {
+            #[derive(serde::Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct Input {
+                nameservers: Vec<String>,
+                assigned_cloudflare: Option<Vec<String>>,
+            }
+            let mut bytes = Vec::new();
+            std::io::stdin()
+                .take(8193)
+                .read_to_end(&mut bytes)
+                .map_err(|_| failure())?;
+            if bytes.len() > 8192 {
+                return Err(zixcel_domain::Error::new("input_budget"));
+            }
+            let input: Input = serde_json::from_slice(&bytes)
+                .map_err(|_| zixcel_domain::Error::new("invalid_manifest"))?;
+            let source = inspection::configured_dns(
+                &input.nameservers,
+                input.assigned_cloudflare.as_deref(),
+            )?;
+            serde_json::json!({"configured_dns":source,"authority_verified":false,"writes_performed":false})
+        }
+        [command] if command == "dns-import-preview" => {
+            #[derive(serde::Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct Input {
+                domain: String,
+                ttl: u32,
+                records: String,
+            }
+            let mut bytes = Vec::new();
+            std::io::stdin()
+                .take(256 * 1024 + 1)
+                .read_to_end(&mut bytes)
+                .map_err(|_| failure())?;
+            if bytes.len() > 256 * 1024 {
+                return Err(zixcel_domain::Error::new("input_budget"));
+            }
+            let input: Input = serde_json::from_slice(&bytes)
+                .map_err(|_| zixcel_domain::Error::new("invalid_manifest"))?;
+            let records = dns_import::parse(&input.domain, input.ttl, &input.records)?;
+            serde_json::json!({"kind":"dns_import_preview","records":records,"writes_performed":false})
+        }
+        [command] if command == "mapping-preview" => {
+            let mut input = Vec::new();
+            std::io::stdin()
+                .take(256 * 1024 + 1)
+                .read_to_end(&mut input)
+                .map_err(|_| failure())?;
+            if input.len() > 256 * 1024 {
+                return Err(zixcel_domain::Error::new("input_budget"));
+            }
+            let input: mapping::MappingInput = serde_json::from_slice(&input)
+                .map_err(|_| zixcel_domain::Error::new("invalid_manifest"))?;
+            serde_json::to_value(mapping::preview(&input)?).map_err(|_| failure())?
+        }
+        [command, domain] if command == "public-nameservers" => {
+            let mut transport = HttpTransport::public_dns()?;
+            serde_json::to_value(inspection::public_nameservers(&mut transport, domain)?)
+                .map_err(|_| failure())?
+        }
+        [command, account] if command == "inspect" => {
+            let mut registrar =
+                HttpTransport::from_env(Provider::ValueDomain, "VALUEDOMAIN_ACCESS_TOKEN")?;
+            let mut dns = HttpTransport::from_env(Provider::Cloudflare, "CLOUDFLARE_API_TOKEN")?;
+            serde_json::to_value(inspection::inspect(&mut registrar, &mut dns, account)?)
+                .map_err(|_| failure())?
+        }
+        [command, account] if command == "inventory" => {
+            let mut registrar =
+                HttpTransport::from_env(Provider::ValueDomain, "VALUEDOMAIN_ACCESS_TOKEN")?;
+            let mut dns = HttpTransport::from_env(Provider::Cloudflare, "CLOUDFLARE_API_TOKEN")?;
+            let domains = valuedomain::domains(&mut registrar)?;
+            let zones = cloudflare::zones(&mut dns, account)?;
+            serde_json::json!({"registrar_domains": domains, "cloudflare_zones": zones,
+                "organization_binding": "explicit_manifest_required", "writes_performed": false})
+        }
+        [command] if command == "valuedomain-domains" => {
+            let mut transport =
+                HttpTransport::from_env(Provider::ValueDomain, "VALUEDOMAIN_ACCESS_TOKEN")?;
+            serde_json::to_value(valuedomain::domains(&mut transport)?).map_err(|_| failure())?
+        }
+        [command, domain] if command == "valuedomain-settings" => {
+            let mut transport =
+                HttpTransport::from_env(Provider::ValueDomain, "VALUEDOMAIN_ACCESS_TOKEN")?;
+            serde_json::to_value(valuedomain::settings(&mut transport, domain)?)
+                .map_err(|_| failure())?
+        }
+        [command, account] if command == "cloudflare-zones" => {
+            let mut transport =
+                HttpTransport::from_env(Provider::Cloudflare, "CLOUDFLARE_API_TOKEN")?;
+            serde_json::to_value(cloudflare::zones(&mut transport, account)?)
+                .map_err(|_| failure())?
+        }
+        [command, zone] if command == "cloudflare-records" => {
+            let mut transport =
+                HttpTransport::from_env(Provider::Cloudflare, "CLOUDFLARE_API_TOKEN")?;
+            serde_json::to_value(cloudflare::records(&mut transport, zone)?)
+                .map_err(|_| failure())?
+        }
+        [command] if command == "validate-bindings" => {
+            let mut input = Vec::new();
+            std::io::stdin()
+                .take(256 * 1024 + 1)
+                .read_to_end(&mut input)
+                .map_err(|_| failure())?;
+            if input.len() > 256 * 1024 {
+                return Err(zixcel_domain::Error::new("input_budget"));
+            }
+            let bindings: Vec<DomainBinding> = serde_json::from_slice(&input)
+                .map_err(|_| zixcel_domain::Error::new("invalid_manifest"))?;
+            validate_bindings(&bindings)?;
+            serde_json::json!({"valid": true, "bindings": bindings.len()})
+        }
+        _ => return Err(failure()),
+    };
+    Ok(serde_json::json!({"schema_version": 1, "result": value}))
+}
+
+fn main() {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    let (value, code) = match run(&args) {
+        Ok(value) => {
+            let code = if value["result"]["complete_for_dns_plan"].as_bool() == Some(false) {
+                2
+            } else {
+                0
+            };
+            (value, code)
+        }
+        Err(error) => (serde_json::json!({"schema_version": 1, "error": error}), 1),
+    };
+    let mut stdout = std::io::stdout().lock();
+    if serde_json::to_writer(&mut stdout, &value).is_err() || writeln!(stdout).is_err() {
+        std::process::exit(1);
+    }
+    std::process::exit(code);
+}

@@ -1,0 +1,56 @@
+name: Release binary
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      ZIXCEL_DOMAIN_SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249
+        with:
+          toolchain: '1.97.1'
+          targets: x86_64-unknown-linux-musl
+          components: rustfmt, clippy
+      - name: Verify source and tag version
+        run: |
+          set -euo pipefail
+          version="$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')"
+          test "$GITHUB_REF_NAME" = "v$version"
+          cargo fmt --all --check
+          cargo test --locked
+          cargo clippy --locked --all-targets -- -D warnings
+      - name: Build static Linux binary
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends musl-tools
+          cargo build --locked --release --target x86_64-unknown-linux-musl
+      - name: Package and smoke test
+        run: |
+          set -euo pipefail
+          binary=target/x86_64-unknown-linux-musl/release/zixcel-domain
+          "$binary" version
+          "$binary" capabilities
+          "$binary" validate-bindings < playground/bindings.json
+          name="zixcel-domain-${GITHUB_REF_NAME}-linux-x86_64"
+          mkdir -p "release/$name"
+          cp "$binary" LICENSE NOTICE README.md "release/$name/"
+          tar -czf "release/$name.tar.gz" -C release "$name"
+          cd release
+          sha256sum "$name.tar.gz" > SHA256SUMS
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release/*.tar.gz release/SHA256SUMS \
+            --verify-tag --title "zixcel-domain $GITHUB_REF_NAME" \
+            --notes 'Linux/WSL x86_64 read-only ValueDomain v2 domain inventory and DNS previews. No DNS writes, token creation or Cloudflare deployment. Built and tested from the tagged source by GitHub Actions.'

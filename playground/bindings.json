@@ -1,0 +1,7 @@
+[
+  {
+    "organization": "example-organization",
+    "domain": "example.test",
+    "cloudflare_account_id": "00000000000000000000000000000000"
+  }
+]

@@ -1,0 +1,18 @@
+[package]
+name = "zixcel-domain"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+license = "Apache-2.0"
+description = "Registrar and DNS inventory for local administrator tools"
+repository = "https://github.com/zixcel/zixcel-domain"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+idna = "1"
+
+[lints.rust]
+unsafe_code = "forbid"

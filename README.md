@@ -1,0 +1,148 @@
+# zixcel-domain — local registrar and DNS administration
+
+One Rust crate owns the library,
+provider adapters and JSON CLI; NERP and Codex can consume the same implementation.
+The first release supports read-only account inventory and offline previews.
+DNS changes, NERP integration and registry publication remain separate work.
+
+This first candidate implements bounded read-only ValueDomain v2 inventory,
+registrar NS/stored DNS inspection, Cloudflare account-scoped zone and record
+inventory, explicit organization/domain manifest validation, and offline DNS
+source/import previews. It does **not**
+implement apply, provider permission discovery, NERP integration or live acceptance.
+Unknown Cloudflare record fields and ValueDomain DNS text are preserved. Registrar
+DNS is never described as authoritative DNS without independent verification.
+
+## Local use
+
+The GitHub release contains a Linux x86_64 musl binary for Linux/WSL, its license
+files and SHA256 checksums. Tag releases are built/tested by GitHub Actions;
+provider credentials are not used by release CI. `version` reports the package
+version and the exact release source SHA. No Cargo registry publication is needed
+to use the binary package.
+
+After installing the binary in `~/.local/bin`, retrieve the domains returned by
+your ValueDomain v2 credential using only that credential:
+
+```sh
+bash playground/list-domains-local.sh
+```
+
+The command stores a successful response privately in `.local/valuedomain-domains.json`.
+It does not require a Cloudflare credential or make DNS changes. The list reflects
+the provider response under the supplied credential; it does not prove write
+permission or provide a complete token-scope audit.
+
+```sh
+cargo build --locked
+target/debug/zixcel-domain capabilities
+target/debug/zixcel-domain validate-bindings < playground/bindings.json
+```
+
+Credentials are resolved from the trusted host environment. Do not put them in
+CLI arguments, model prompts, source, Issue comments or transcripts. From a local
+Bash terminal, enter existing credentials without echo or shell-history exposure:
+
+```sh
+read -rsp 'ValueDomain v2 access token: ' VALUEDOMAIN_ACCESS_TOKEN
+echo
+export VALUEDOMAIN_ACCESS_TOKEN
+read -rsp 'Cloudflare API token: ' CLOUDFLARE_API_TOKEN
+echo
+export CLOUDFLARE_API_TOKEN
+umask 077
+mkdir -p .local
+target/debug/zixcel-domain inventory 00000000000000000000000000000001 > .local/inventory.json
+unset VALUEDOMAIN_ACCESS_TOKEN CLOUDFLARE_API_TOKEN
+```
+
+The ValueDomain credential must be for VDAPI **v2**, not an assumed-compatible v1
+key. An authorization/IP restriction failure is returned as an error, never an
+empty inventory. Consult the provider's current account/API configuration.
+Cloudflare requires access to the selected account's zones; record inspection
+also requires DNS Read. A successful read is not proof of write authorization.
+Use `valuedomain-settings DOMAIN` and `cloudflare-records ZONE_ID` for individual
+targets. Review saved DNS data locally before sharing it; inventories are not
+automatically uploaded or made public.
+
+After inventory, inspect registrar NS/stored DNS for every listed domain and the
+existing Cloudflare zone records with one bounded read-only operation:
+
+```sh
+bash playground/inspect-local.sh 00000000000000000000000000000001
+```
+
+This prompts for existing credentials only if absent from the caller environment,
+keeps them in process memory, and saves observations to `.local/inspection.json`
+with private file permissions. Exit 0 means all requested resource reads completed;
+exit 2 means explicit unavailable observations remain and `complete_for_dns_plan`
+is false. Neither authorizes a write. Failure before inventory completion does not
+overwrite an earlier snapshot and saves the redacted failure to `.local/inspection-error.json`.
+Errors include provider/operation labels but no raw provider message, URL or credential.
+When registrar NS exactly match the account's assigned Cloudflare NS, inspection
+uses Cloudflare records and marks registrar storage `not_applicable`; it does not
+send an unsupported storage request or require broader registrar permissions.
+Mixed NS remain incomplete even if registrar storage can be read.
+`public-nameservers DOMAIN` also observes NS through Cloudflare's recursive DoH
+resolver without credentials. It labels this as recursive evidence, not direct
+authoritative-server validation or final propagation acceptance. NXDOMAIN and
+SERVFAIL remain distinct from empty results; neither cancels registrar ownership.
+
+`mapping-preview` reads a JSON object with `bindings`, `registrar_domains`,
+`cloudflare_zones` and `cloudflare_account_id` from stdin. It matches declared
+ownership without performing network access or changes. A zone absent from the
+current credential's visible inventory requires visibility/permission review;
+it is never automatic authorization to create or delete a zone.
+
+`dns-source-preview` reads `nameservers` and optional `assigned_cloudflare` lists
+from stdin and compares exact normalized names. Mixed ValueDomain/external NS and
+lookalike vendor suffixes remain untrusted. This describes configured NS, not
+authoritative-server verification.
+
+`dns-import-preview` reads `{ "domain": "example.test", "ttl": 3600,
+"records": "a @ 192.0.2.1" }` from stdin. It prepares DNS-only A/AAAA/CNAME/MX/TXT/SRV
+records without sending requests. MX priorities, TXT quotation bytes, SRV fields,
+wildcards and TTLs are retained. Unknown directives, outside-zone owners, invalid
+addresses, unsupported TXT encodings or TTLs reject the entire import. Preview
+conversion is not provider acceptance or authorization. No implicit deletion,
+NS/DS change, proxy activation or token creation occurs. Public examples and test
+identifiers are synthetic; real profiles and observations belong outside source.
+
+## Boundaries and tests
+
+Live HTTPS origins are fixed. Redirects and ambient proxies are disabled. Budgets:
+90 seconds per transport, 15 seconds per request, 100 requests, 1 MiB per response,
+8 MiB aggregate. Cancellation currently means terminating the CLI; no write can
+be started. Partial inventory pages, duplicate identifiers, inconsistent totals,
+wrong accounts and malformed records fail closed. Individual resource read
+failures are explicitly recorded and block complete DNS planning. Raw HTTP
+errors/bodies are not logged. ValueDomain's official stored-DNS GET supports
+`valuedomain1` and `valuedomain11`; a failure is not evidence that no DNS exists.
+There is no automatic retry or token persistence.
+
+```sh
+cargo fmt --all --check
+cargo test --locked
+cargo clippy --locked --all-targets -- -D warnings
+```
+
+Tests use in-memory provider fixtures and the actual CLI. They require no live
+credentials. Plan/apply must bind exact account/zone/snapshot/manifest/expiry and
+one-use approval; drift, uncertain writes and preservation of non-owned/mail DNS
+must be tested before enabling writes. Public source reflection requires review;
+real DNS/NS changes and site deployment remain separate acceptance steps (#110).
+
+## Official contracts
+
+- [ValueDomain API entry](https://one.value-domain.com/service/api)
+- [ValueDomain v2 domain OpenAPI](https://one.value-domain.com/doc/api/v2/domain/spec.yaml)
+- [Cloudflare zones](https://developers.cloudflare.com/api/resources/zones/methods/list/)
+- [Cloudflare DNS records](https://developers.cloudflare.com/api/resources/dns/subresources/records/methods/list/)
+
+Contracts inspected on 2026-10-14. The OpenAPI descriptions were inspected for
+endpoint/authentication/pagination facts; no provider implementation was copied.
+
+`public-dns DOMAIN TYPE` inspects NS/SOA/DS/MX/TXT/A/AAAA/CAA through the fixed
+recursive resolver. It distinguishes failed DNS answers from successful NODATA
+and always reports `zone_inventory_complete: false`. Apex queries cannot enumerate
+all subdomains or establish which administrative system holds the full zone.
