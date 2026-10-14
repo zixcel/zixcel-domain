@@ -15,7 +15,7 @@ fn run(args: &[String]) -> Result<serde_json::Value> {
         }),
         [command] if command == "capabilities" => serde_json::json!({
             "schema_version": 1, "registrar": "valuedomain-v2", "dns": "cloudflare",
-            "operations": ["inventory", "inspect", "mapping-preview", "dns-source-preview", "dns-import-preview", "public-dns", "public-nameservers", "valuedomain-domains", "valuedomain-settings", "valuedomain-free-dns", "valuedomain-nameservers", "domain-session", "domain-control", "cloudflare-zones", "cloudflare-records", "validate-bindings"],
+            "operations": ["inventory", "inspect", "mapping-preview", "dns-source-preview", "dns-import-preview", "public-dns", "public-nameservers", "public-delegation", "valuedomain-domains", "valuedomain-settings", "valuedomain-free-dns", "valuedomain-nameservers", "domain-session", "domain-control", "cloudflare-zones", "cloudflare-records", "validate-bindings"],
             "writes_supported": true, "live_acceptance": false,
             "write_operations": ["prepare_zone", "change_nameservers"],
             "write_boundary": "scoped_local_session_one_use_plan_hash_approval"
@@ -105,6 +105,9 @@ fn run(args: &[String]) -> Result<serde_json::Value> {
             let input: mapping::MappingInput = serde_json::from_slice(&input)
                 .map_err(|_| zixcel_domain::Error::new("invalid_manifest"))?;
             serde_json::to_value(mapping::preview(&input)?).map_err(|_| failure())?
+        }
+        [command, domain] if command == "public-delegation" => {
+            serde_json::json!({"domain":zixcel_domain::domain_name(domain)?,"nameservers":zixcel_domain::delegation::query(domain)?,"observation":"parent_referral","dnssec_validated":false,"writes_performed":false})
         }
         [command, domain] if command == "public-nameservers" => {
             let mut transport = HttpTransport::public_dns()?;

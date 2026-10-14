@@ -19,6 +19,7 @@ pub struct Source {
     pub domain: String,
     pub registrar_nameservers: Vec<String>,
     pub public_nameservers: Vec<String>,
+    pub parent_delegation_nameservers: Vec<String>,
     pub public_soa: String,
     pub dns_service: String,
     pub records: String,
@@ -88,21 +89,29 @@ pub fn source(
     if public_nameservers.is_empty() {
         return Err(error("authoritative_source_unknown"));
     }
+    let parent_delegation_nameservers = sorted(public.delegation(&domain)?);
+    if parent_delegation_nameservers.is_empty() {
+        return Err(error("delegation_missing"));
+    }
     let is_service = |numbers: &[u8]| {
-        public_nameservers.iter().all(|n| {
+        parent_delegation_nameservers.iter().all(|n| {
             numbers
                 .iter()
                 .any(|v| *n == format!("ns{v}.value-domain.com"))
         })
     };
+    let registered = valuedomain::stored_dns(registrar, &domain)?;
     let dns = if is_service(&[1, 2, 3, 4, 5]) {
-        valuedomain::free_dns(registrar, &domain)?
+        if registered.ns_type == "valuedomain1" {
+            registered
+        } else {
+            valuedomain::free_dns(registrar, &domain)?
+        }
     } else if is_service(&[11, 12, 13]) {
-        let value = valuedomain::stored_dns(registrar, &domain)?;
-        if value.ns_type != "valuedomain11" {
+        if registered.ns_type != "valuedomain11" {
             return Err(error("authoritative_source_mismatch"));
         }
-        value
+        registered
     } else {
         return Err(error("authoritative_source_unknown"));
     };
@@ -111,11 +120,7 @@ pub fn source(
         return Err(error("input_budget"));
     }
     let soa = public_dns::query(public, &domain, "SOA")?;
-    if soa.answers.len() != 1
-        || !public_nameservers
-            .iter()
-            .any(|n| soa.answers[0].data.starts_with(&format!("{n}. ")))
-    {
+    if soa.answers.len() != 1 {
         return Err(error("authoritative_source_mismatch"));
     }
     let ds = public_dns::query(public, &domain, "DS")?;
@@ -143,6 +148,7 @@ pub fn source(
         domain,
         registrar_nameservers,
         public_nameservers,
+        parent_delegation_nameservers,
         public_soa: soa.answers[0].data.clone(),
         dns_service: dns.ns_type,
         records: dns.records,
@@ -524,6 +530,7 @@ mod tests {
                 domain: "example.test".into(),
                 registrar_nameservers: vec![],
                 public_nameservers: vec![],
+                parent_delegation_nameservers: vec![],
                 public_soa: "".into(),
                 dns_service: "valuedomain1".into(),
                 records: "".into(),

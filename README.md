@@ -184,7 +184,7 @@ zixcel-domain domain-control .local/domain-control.sock apply SECOND_PLAN_SHA256
 zixcel-domain domain-control .local/domain-control.sock stop
 ```
 
-Plans expire after 10 minutes and bind the source export, registrar/public NS,
+Plans expire after 10 minutes and bind the source export, registrar/public NS and parent delegation,
 SOA, parent DS observation, domain/account, zone snapshot, preserved records
 and a random session nonce. Apply re-reads snapshots, rejects drift and consumes
 the issued hash even on failure. Another or restarted session cannot accept it.
@@ -201,6 +201,9 @@ return receipts and must be reconciled with reads before a fresh plan; they
 are never blindly retried. A verified registrar update is not public DNS
 propagation or site acceptance. Rollback requires a separately reviewed plan.
 
-The ValueDomain ns1..ns5 FreeDNS export (`GET /freedns/{domain}`) is read separately
-from registrar-stored ns11 DNS. The observed NS/SOA select the source service;
-a registrar storage snapshot alone is not authoritative evidence.
+Parent referrals from fixed root servers select the source service, independently
+of stale child NS/SOA names. Registered DNS (`GET /domains/{domain}/dns`) matching
+that delegation is preferred. The separate FreeDNS export (`GET /freedns/{domain}`)
+is used for delegated ns1..ns5 only when the registered namespace does not match.
+A registrar storage snapshot alone is not authoritative evidence. See
+[the API distinction and bounded delegation checks](docs/valuedomain-dns-api.md).

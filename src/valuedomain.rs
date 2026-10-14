@@ -156,6 +156,7 @@ pub fn stored_dns(transport: &mut impl ReadTransport, input: &str) -> Result<Sto
             .to_owned(),
         ttl: response["results"]["ttl"]
             .as_u64()
+            .or_else(|| response["results"]["ttl"].as_str()?.parse().ok())
             .ok_or_else(|| error("invalid_dns"))?,
         authority_verified: false,
     })
