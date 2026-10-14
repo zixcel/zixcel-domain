@@ -1,6 +1,6 @@
 # Source scope and completion
 
-This repository candidate owns registrar/DNS inventory, configured NS classification,
+This repository owns registrar/DNS inventory, configured NS classification,
 explicit organization/domain matching and record import previews for administrator
 tools. One crate supplies the library and JSON CLI. Real profiles, snapshots,
 credentials and approval/operation receipts must remain outside public source.
@@ -11,11 +11,12 @@ separately from fixture evidence. A failed optional registrar-storage read must
 not erase successful NS/authoritative-provider observations. Missing authoritative
 data must never be replaced with an empty zone or deletion proposal.
 
-The full #148 scope remains incomplete: credential permission discovery, exact
-snapshot/manifest/source-bound plan and approval, one-use bounded writes, drift
-checks, uncertain-result handling and read-back, NERP opt-in, independently owned
-CI/release/deploy routes and live acceptance. Preview commands do not implement
-these controls and cannot be used to claim source/operation completion.
+Version 0.2 adds a scoped local session with snapshot-bound, expiring, one-use
+approval for zone preparation and registrar NS changes. This is not arbitrary
+DNS write support. The full #148 scope remains incomplete: permission discovery,
+all-provider operation/rollback contracts, NERP opt-in, independent remote
+operation routes and full live acceptance. Package/fixture success does not
+complete an actual migration or prove external DNS propagation.
 
 Before any actual DNS/NS or site change, fix the selected targets, explicit diff,
 mail/service preservation, DNSSEC/delegation checks, exact artifact and rollback

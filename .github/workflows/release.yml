@@ -53,4 +53,4 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" release/*.tar.gz release/SHA256SUMS \
             --verify-tag --title "zixcel-domain $GITHUB_REF_NAME" \
-            --notes 'Linux/WSL x86_64 read-only ValueDomain v2 domain inventory and DNS previews. No DNS writes, token creation or Cloudflare deployment. Built and tested from the tagged source by GitHub Actions.'
+            --notes 'Linux/WSL x86_64 domain inventory and scoped DNS migration sessions. Writes require an issued one-use plan hash in a private local session. No token creation or site deployment. Built and tested from the tagged source by GitHub Actions.'

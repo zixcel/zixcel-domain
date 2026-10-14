@@ -161,6 +161,30 @@ pub fn stored_dns(transport: &mut impl ReadTransport, input: &str) -> Result<Sto
     })
 }
 
+/// The ns1..ns5 service is separate from registrar-stored ns11 DNS.
+pub fn free_dns(transport: &mut impl ReadTransport, input: &str) -> Result<StoredDns> {
+    let domain = domain_name(input)?;
+    let response = transport
+        .get(&format!("/freedns/{domain}"))
+        .map_err(|error| error.for_operation("read_free_dns"))?;
+    verify_domain(&response, &domain)?;
+    let value = &response["results"];
+    let ttl = value["ttl"]
+        .as_u64()
+        .or_else(|| value["ttl"].as_str()?.parse().ok())
+        .ok_or_else(|| error("invalid_dns"))?;
+    Ok(StoredDns {
+        domain,
+        records: value["records"]
+            .as_str()
+            .ok_or_else(|| error("invalid_dns"))?
+            .to_owned(),
+        ns_type: "valuedomain1".to_owned(),
+        ttl,
+        authority_verified: false,
+    })
+}
+
 pub fn settings(transport: &mut impl ReadTransport, input: &str) -> Result<DomainSettings> {
     let domain = domain_name(input)?;
     let nameservers = nameservers(transport, &domain)?;

@@ -2,14 +2,15 @@
 
 One Rust crate owns the library,
 provider adapters and JSON CLI; NERP and Codex can consume the same implementation.
-The first release supports read-only account inventory and offline previews.
-DNS changes, NERP integration and registry publication remain separate work.
+The 0.1 releases provide account inventory and offline previews. Version 0.2 adds
+scoped local DNS migration sessions with one-use plan approvals. NERP integration,
+registry publication and deployment acceptance remain separate work.
 
-This first candidate implements bounded read-only ValueDomain v2 inventory,
+The library implements bounded ValueDomain v2 inventory,
 registrar NS/stored DNS inspection, Cloudflare account-scoped zone and record
 inventory, explicit organization/domain manifest validation, and offline DNS
 source/import previews. It does **not**
-implement apply, provider permission discovery, NERP integration or live acceptance.
+implement arbitrary DNS edits, provider permission discovery, NERP integration or full live acceptance.
 Unknown Cloudflare record fields and ValueDomain DNS text are preserved. Registrar
 DNS is never described as authoritative DNS without independent verification.
 
@@ -163,3 +164,43 @@ The CLI reads each domain's effective setting through VDAPI v2: individual
 partial responses and request budget exhaustion fail without returning a
 partial filtered list. This flag reads settings; it never changes them.
 Contract: https://one.value-domain.com/doc/api/v2/domain/spec.yaml
+
+## Scoped DNS migration session (Linux/WSL)
+
+Use the existing provider credentials in a trusted local terminal. The helper
+holds them only in its process environment; the socket carries intents/results,
+not tokens. The socket directory must be private (0700), the socket is 0600,
+and the session expires in 20 minutes. Only the selected domain and account
+can be operated on. Local processes running as the same OS user are trusted.
+
+```sh
+bash playground/domain-session-local.sh example.org CLOUDFLARE_ACCOUNT_ID
+# Keep that terminal open. From a second terminal:
+zixcel-domain domain-control .local/domain-control.sock observe
+zixcel-domain domain-control .local/domain-control.sock plan prepare_zone
+zixcel-domain domain-control .local/domain-control.sock apply PLAN_SHA256
+zixcel-domain domain-control .local/domain-control.sock plan change_nameservers
+zixcel-domain domain-control .local/domain-control.sock apply SECOND_PLAN_SHA256
+zixcel-domain domain-control .local/domain-control.sock stop
+```
+
+Plans expire after 10 minutes and bind the source export, registrar/public NS,
+SOA, parent DS observation, domain/account, zone snapshot, preserved records
+and a random session nonce. Apply re-reads snapshots, rejects drift and consumes
+the issued hash even on failure. Another or restarted session cannot accept it.
+Plan approval is an explicit trusted-operator action, not a provider permission
+or an automatic human approval. Only execute plans authorized for your task.
+
+The current write phases create a Cloudflare zone if needed, append missing
+preservation records without overwriting/deleting existing ones, and update
+ValueDomain registrar NS after DNS read-back. Web apex A/AAAA/CNAME records are
+reserved for a separate site binding; direct MX/SPF dependencies on that apex
+block the migration. Parent DS requires a separate DNSSEC transition. Unknown
+syntax, incompatible RRsets or budgets fail closed. Partial/uncertain writes
+return receipts and must be reconciled with reads before a fresh plan; they
+are never blindly retried. A verified registrar update is not public DNS
+propagation or site acceptance. Rollback requires a separately reviewed plan.
+
+The ValueDomain ns1..ns5 FreeDNS export (`GET /freedns/{domain}`) is read separately
+from registrar-stored ns11 DNS. The observed NS/SOA select the source service;
+a registrar storage snapshot alone is not authoritative evidence.
