@@ -217,8 +217,10 @@ owner can explicitly start a scoped session with
 plans identify `source_mode: empty_registered_unserved`, leave public SOA/mail
 observations unavailable, and use the owner's empty registered configuration.
 
-Admission requires authenticated domain inventory, an empty `valuedomain11`
-configuration, matching registrar and direct-parent ns11/ns12/ns13 delegation,
+Admission requires authenticated domain inventory and an empty registered configuration.
+The stored service must match the complete registrar/direct-parent set:
+`valuedomain11` uses ns11/ns12/ns13; `valuedomain1` uses ns1/ns2/ns3/ns4/ns5.
+Admission also requires
 no observed parent DS, and no pre-existing target-zone records. Nonempty source,
 mixed delegation, unknown DNS errors, DNSSEC or target data are rejected. Inputs
 are re-read before each one-use hash applies; drift consumes the plan without a
