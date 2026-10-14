@@ -35,6 +35,9 @@ impl Provider {
 /// Test transports receive no credential. Live transport is a fixed-origin trusted host.
 pub trait ReadTransport {
     fn get(&mut self, path: &str) -> Result<Value>;
+    fn delegation(&mut self, _domain: &str) -> Result<Vec<String>> {
+        Err(error("delegation_unavailable"))
+    }
 }
 
 pub trait WriteTransport: ReadTransport {
@@ -93,6 +96,19 @@ impl HttpTransport {
     }
 }
 impl ReadTransport for HttpTransport {
+    fn delegation(&mut self, domain: &str) -> Result<Vec<String>> {
+        if !matches!(self.provider, Provider::PublicDns) || self.authorization.is_some() {
+            return Err(error("delegation_requires_no_credential"));
+        }
+        if self.requests_left < 24
+            || self.deadline.saturating_duration_since(Instant::now()) < Duration::from_secs(18)
+        {
+            return Err(error("request_budget"));
+        }
+        self.requests_left -= 24;
+        crate::delegation::query(domain)
+            .map_err(|error| error.with_context("public-dns", "read_parent_delegation"))
+    }
     fn get(&mut self, path: &str) -> Result<Value> {
         self.request(reqwest::Method::GET, path, None)
             .map_err(|error| error.with_context(self.provider.name(), "http_get"))

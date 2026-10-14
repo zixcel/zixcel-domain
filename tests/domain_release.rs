@@ -11,6 +11,8 @@ struct Registrar {
     ns: Vec<String>,
     records: String,
     puts: usize,
+    dns_type: String,
+    free_reads: usize,
 }
 impl Registrar {
     fn new() -> Self {
@@ -21,6 +23,8 @@ impl Registrar {
             ],
             records: "a @ 203.0.113.1\nmx mail.example.test 10\ntxt @ \"v=spf1 -all\"".into(),
             puts: 0,
+            dns_type: "valuedomain11".into(),
+            free_reads: 0,
         }
     }
 }
@@ -33,9 +37,15 @@ impl ReadTransport for Registrar {
             "/domains/example.test/nameserver" => {
                 Ok(json!({"results":{"domainname":"example.test","ns":self.ns}}))
             }
-            "/freedns/example.test" => Ok(
-                json!({"results":{"domainname":"example.test","records":self.records,"ttl":"3600"}}),
+            "/domains/example.test/dns" => Ok(
+                json!({"results":{"domainname":"example.test","records":self.records,"ttl":"3600","ns_type":self.dns_type}}),
             ),
+            "/freedns/example.test" => {
+                self.free_reads += 1;
+                Ok(
+                    json!({"results":{"domainname":"example.test","records":self.records,"ttl":"3600"}}),
+                )
+            }
             _ => Err(Error::new("unexpected_fixture_request")),
         }
     }
@@ -118,8 +128,19 @@ impl WriteTransport for Dns {
 }
 struct Public {
     ds: bool,
+    delegated_11: bool,
 }
 impl ReadTransport for Public {
+    fn delegation(&mut self, _: &str) -> Result<Vec<String>> {
+        Ok(vec![
+            if self.delegated_11 {
+                "ns11.value-domain.com"
+            } else {
+                "ns1.value-domain.com"
+            }
+            .into(),
+        ])
+    }
     fn get(&mut self, path: &str) -> Result<Value> {
         let kind = path.rsplit('=').next().unwrap();
         let (number, data) = match kind {
@@ -160,7 +181,10 @@ fn planned(
 #[test]
 fn free_dns_uses_authoritative_service_and_accepts_documented_string_ttl() {
     let mut r = Registrar::new();
-    let mut p = Public { ds: false };
+    let mut p = Public {
+        ds: false,
+        delegated_11: false,
+    };
     let s = source(&mut r, &mut p, "example.test").unwrap();
     assert_eq!(s.dns_service, "valuedomain1");
     assert_eq!(s.ttl, 3600);
@@ -174,7 +198,14 @@ fn free_dns_uses_authoritative_service_and_accepts_documented_string_ttl() {
 }
 #[test]
 fn plans_preserve_mail_exclude_web_apex_and_bind_one_use_approval() {
-    let (mut r, mut d, mut p) = (Registrar::new(), Dns::new(), Public { ds: false });
+    let (mut r, mut d, mut p) = (
+        Registrar::new(),
+        Dns::new(),
+        Public {
+            ds: false,
+            delegated_11: false,
+        },
+    );
     let mut s = Session::new("example.test", ACCOUNT).unwrap();
     let hash = planned(&mut s, "prepare_zone", &mut r, &mut d, &mut p);
     let receipt = s.apply(&hash, &mut r, &mut d, &mut p).unwrap();
@@ -202,7 +233,14 @@ fn plans_preserve_mail_exclude_web_apex_and_bind_one_use_approval() {
 }
 #[test]
 fn snapshot_drift_consumes_approval_without_writes() {
-    let (mut r, mut d, mut p) = (Registrar::new(), Dns::new(), Public { ds: false });
+    let (mut r, mut d, mut p) = (
+        Registrar::new(),
+        Dns::new(),
+        Public {
+            ds: false,
+            delegated_11: false,
+        },
+    );
     let mut s = Session::new("example.test", ACCOUNT).unwrap();
     let hash = planned(&mut s, "prepare_zone", &mut r, &mut d, &mut p);
     r.records.push_str("\ntxt extra \"changed\"");
@@ -215,7 +253,14 @@ fn snapshot_drift_consumes_approval_without_writes() {
 }
 #[test]
 fn uncertain_record_write_is_not_retried_or_reported_applied() {
-    let (mut r, mut d, mut p) = (Registrar::new(), Dns::new(), Public { ds: false });
+    let (mut r, mut d, mut p) = (
+        Registrar::new(),
+        Dns::new(),
+        Public {
+            ds: false,
+            delegated_11: false,
+        },
+    );
     let mut s = Session::new("example.test", ACCOUNT).unwrap();
     let hash = planned(&mut s, "prepare_zone", &mut r, &mut d, &mut p);
     d.fail_record = true;
@@ -231,7 +276,14 @@ fn uncertain_record_write_is_not_retried_or_reported_applied() {
 }
 #[test]
 fn nameserver_switch_requires_verified_copy_and_absent_ds() {
-    let (mut r, mut d, mut p) = (Registrar::new(), Dns::new(), Public { ds: false });
+    let (mut r, mut d, mut p) = (
+        Registrar::new(),
+        Dns::new(),
+        Public {
+            ds: false,
+            delegated_11: false,
+        },
+    );
     let mut s = Session::new("example.test", ACCOUNT).unwrap();
     assert_eq!(
         s.plan("change_nameservers", &mut r, &mut d, &mut p)
@@ -264,7 +316,14 @@ fn nameserver_switch_requires_verified_copy_and_absent_ds() {
 }
 #[test]
 fn self_targeted_mail_and_incompatible_records_are_rejected() {
-    let (mut r, mut d, mut p) = (Registrar::new(), Dns::new(), Public { ds: false });
+    let (mut r, mut d, mut p) = (
+        Registrar::new(),
+        Dns::new(),
+        Public {
+            ds: false,
+            delegated_11: false,
+        },
+    );
     let mut s = Session::new("example.test", ACCOUNT).unwrap();
     r.records = "a @ 203.0.113.1\nmx @ 10".into();
     assert_eq!(
@@ -278,7 +337,14 @@ fn self_targeted_mail_and_incompatible_records_are_rejected() {
 
 #[test]
 fn public_mail_records_missing_from_export_block_zone_preparation() {
-    let (mut registrar, mut dns, mut public) = (Registrar::new(), Dns::new(), Public { ds: false });
+    let (mut registrar, mut dns, mut public) = (
+        Registrar::new(),
+        Dns::new(),
+        Public {
+            ds: false,
+            delegated_11: false,
+        },
+    );
     registrar.records = "a @ 203.0.113.1\ntxt @ \"v=spf1 -all\"".into();
     let mut session = Session::new("example.test", ACCOUNT).unwrap();
     assert_eq!(
@@ -290,4 +356,51 @@ fn public_mail_records_missing_from_export_block_zone_preparation() {
     );
     assert_eq!(dns.posts, 0);
     assert_eq!(registrar.puts, 0);
+}
+
+#[test]
+fn parent_delegation_selects_registered_dns_despite_stale_child_ns_and_soa() {
+    let mut r = Registrar::new();
+    let mut p = Public {
+        ds: false,
+        delegated_11: true,
+    };
+    let s = source(&mut r, &mut p, "example.test").unwrap();
+    assert_eq!(s.dns_service, "valuedomain11");
+    assert_ne!(s.parent_delegation_nameservers, s.public_nameservers);
+    assert!(s.public_soa.starts_with("ns1.value-domain.com."));
+    assert_eq!(r.free_reads, 0);
+}
+
+#[test]
+fn registered_ns1_domain_does_not_need_membership_in_separate_freedns_inventory() {
+    let mut r = Registrar::new();
+    r.dns_type = "valuedomain1".into();
+    let mut p = Public {
+        ds: false,
+        delegated_11: false,
+    };
+    assert_eq!(
+        source(&mut r, &mut p, "example.test").unwrap().dns_service,
+        "valuedomain1"
+    );
+    assert_eq!(r.free_reads, 0);
+}
+
+#[test]
+fn parent_delegation_drift_consumes_plan_before_cloudflare_writes() {
+    let (mut r, mut d, mut p) = (
+        Registrar::new(),
+        Dns::new(),
+        Public {
+            ds: false,
+            delegated_11: false,
+        },
+    );
+    let mut session = Session::new("example.test", ACCOUNT).unwrap();
+    let hash = planned(&mut session, "prepare_zone", &mut r, &mut d, &mut p);
+    p.delegated_11 = true;
+    assert!(session.apply(&hash, &mut r, &mut d, &mut p).is_err());
+    assert_eq!(d.posts, 0);
+    assert!(session.apply(&hash, &mut r, &mut d, &mut p).is_err());
 }

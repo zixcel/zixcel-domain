@@ -1,5 +1,6 @@
 //! Local registrar/DNS inventory. Credentials never enter the inventory model.
 pub mod cloudflare;
+pub mod delegation;
 pub mod dns_import;
 pub mod domain_release;
 #[cfg(unix)]
