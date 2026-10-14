@@ -53,6 +53,9 @@ pub struct Plan {
     pub source: Source,
     pub zone: Option<ZoneState>,
     pub records_to_preserve: Vec<Value>,
+    pub records_to_retire: Vec<Value>,
+    pub records_to_add: Vec<Value>,
+    pub retire_unused_mail: bool,
     pub created_at: u64,
     pub expires_at: u64,
     pub nonce: String,
@@ -234,7 +237,7 @@ pub fn contains_record(existing: &[Value], desired: &Value) -> bool {
         .iter()
         .any(|r| normalized(r) == normalized(desired))
 }
-fn desired(source: &Source) -> Result<Vec<Value>> {
+fn desired(source: &Source, retire_mail: bool) -> Result<(Vec<Value>, Vec<Value>, Vec<Value>)> {
     let records = serde_json::to_value(dns_import::parse(
         &source.domain,
         source.ttl,
@@ -245,31 +248,33 @@ fn desired(source: &Source) -> Result<Vec<Value>> {
     if records.len() > 50 {
         return Err(error("migration_record_budget"));
     }
-    if records.iter().any(|r| {
-        r["type"] == "MX"
-            && r["content"]
-                .as_str()
-                .is_some_and(|s| s.trim_end_matches('.') == source.domain)
-    }) {
-        return Err(error("mail_depends_on_web_apex"));
-    }
-    for record in records {
-        if record["type"] == "TXT" {
-            let text = record["content"]
-                .as_str()
-                .unwrap_or("")
-                .trim_matches('"')
-                .to_lowercase();
-            if text.starts_with("v=spf1")
-                && text.split_whitespace().any(|t| {
-                    let mechanism = t.trim_start_matches(['+', '-', '~', '?']);
-                    mechanism == "a"
-                        || mechanism.starts_with("a/")
-                        || mechanism == format!("a:{}", source.domain)
-                        || mechanism.starts_with(&format!("a:{}/", source.domain))
-                })
-            {
-                return Err(error("mail_depends_on_web_apex"));
+    if !retire_mail {
+        if records.iter().any(|r| {
+            r["type"] == "MX"
+                && r["content"]
+                    .as_str()
+                    .is_some_and(|s| s.trim_end_matches('.') == source.domain)
+        }) {
+            return Err(error("mail_depends_on_web_apex"));
+        }
+        for record in records {
+            if record["type"] == "TXT" {
+                let text = record["content"]
+                    .as_str()
+                    .unwrap_or("")
+                    .trim_matches('"')
+                    .to_lowercase();
+                if text.starts_with("v=spf1")
+                    && text.split_whitespace().any(|t| {
+                        let mechanism = t.trim_start_matches(['+', '-', '~', '?']);
+                        mechanism == "a"
+                            || mechanism.starts_with("a/")
+                            || mechanism == format!("a:{}", source.domain)
+                            || mechanism.starts_with(&format!("a:{}/", source.domain))
+                    })
+                {
+                    return Err(error("mail_depends_on_web_apex"));
+                }
             }
         }
     }
@@ -284,14 +289,55 @@ fn desired(source: &Source) -> Result<Vec<Value>> {
             return Err(error("public_mail_export_mismatch"));
         }
     }
-    Ok(records
+    let retired = if retire_mail {
+        records
+            .iter()
+            .filter(|r| unused_mail_record(r))
+            .cloned()
+            .collect()
+    } else {
+        vec![]
+    };
+    let preserve = records
         .iter()
         .filter(|r| {
             !(r["name"] == source.domain
                 && matches!(r["type"].as_str(), Some("A" | "AAAA" | "CNAME")))
+                && !(retire_mail && unused_mail_record(r))
         })
         .cloned()
-        .collect())
+        .collect();
+    let add = if retire_mail {
+        serde_json::to_value(dns_import::parse(
+            &source.domain,
+            source.ttl,
+            "mx . 0\ntxt @ \"v=spf1 -all\"\ntxt _dmarc \"v=DMARC1; p=reject;\"",
+        )?)
+        .map_err(|_| error("invalid_dns"))?
+        .as_array()
+        .ok_or_else(|| error("invalid_dns"))?
+        .clone()
+    } else {
+        vec![]
+    };
+    Ok((preserve, retired, add))
+}
+fn unused_mail_record(record: &Value) -> bool {
+    let kind = record["type"].as_str().unwrap_or("");
+    let name = record["name"].as_str().unwrap_or("").to_lowercase();
+    let text = record["content"]
+        .as_str()
+        .unwrap_or("")
+        .trim_matches('"')
+        .to_lowercase();
+    kind == "MX"
+        || (matches!(kind, "TXT" | "CNAME")
+            && (name.contains("._domainkey.")
+                || (kind == "TXT"
+                    && (text.starts_with("v=spf1")
+                        || text.starts_with("v=dmarc1")
+                        || text.starts_with("v=dkim1")
+                        || text.starts_with("v=stsv1")))))
 }
 /// Hash approvals are accepted only for plans issued in this live scoped session.
 pub struct Session {
@@ -299,6 +345,7 @@ pub struct Session {
     account: String,
     issued: BTreeMap<String, Plan>,
     allow_empty_unserved: bool,
+    retire_unused_mail: bool,
 }
 impl Session {
     pub fn new(domain: &str, account: &str) -> Result<Self> {
@@ -310,10 +357,15 @@ impl Session {
             account: account.into(),
             issued: BTreeMap::new(),
             allow_empty_unserved: false,
+            retire_unused_mail: false,
         })
     }
     pub fn allow_empty_registered_unserved(mut self) -> Self {
         self.allow_empty_unserved = true;
+        self
+    }
+    pub fn retire_unused_mail(mut self) -> Self {
+        self.retire_unused_mail = true;
         self
     }
     fn observed_source(
@@ -357,7 +409,24 @@ impl Session {
         {
             return Err(error("empty_target_zone_required"));
         }
-        let records_to_preserve = desired(&source)?;
+        let (records_to_preserve, records_to_retire, records_to_add) =
+            desired(&source, self.retire_unused_mail)?;
+        if self.retire_unused_mail
+            && zone
+                .as_ref()
+                .is_some_and(|z| z.records.iter().any(unused_mail_record))
+        {
+            // Existing target mail is a separate destructive action; never delete it here.
+            // Exact no-mail declarations from this plan are allowed on re-observation.
+            let z = zone.as_ref().ok_or_else(|| error("zone_not_prepared"))?;
+            if z.records
+                .iter()
+                .filter(|r| unused_mail_record(r))
+                .any(|r| !contains_record(&records_to_add, r))
+            {
+                return Err(error("target_mail_retirement_requires_review"));
+            }
+        }
         if phase == "change_nameservers" {
             if source.parent_ds_present {
                 return Err(error("dnssec_transition_required"));
@@ -365,6 +434,7 @@ impl Session {
             let z = zone.as_ref().ok_or_else(|| error("zone_not_prepared"))?;
             if !records_to_preserve
                 .iter()
+                .chain(records_to_add.iter())
                 .all(|r| contains_record(&z.records, r))
             {
                 return Err(error("dns_copy_not_verified"));
@@ -384,6 +454,9 @@ impl Session {
             source,
             zone,
             records_to_preserve,
+            records_to_retire,
+            records_to_add,
+            retire_unused_mail: self.retire_unused_mail,
             created_at,
             expires_at: created_at + 600,
             nonce: nonce.iter().map(|x| format!("{x:02x}")).collect(),
@@ -465,7 +538,11 @@ impl Session {
                     .ok_or_else(|| error("zone_creation_not_observed"))?
             };
             // Reject incompatible existing RRsets before any record additions.
-            for desired in &plan.records_to_preserve {
+            for desired in plan
+                .records_to_preserve
+                .iter()
+                .chain(plan.records_to_add.iter())
+            {
                 if !contains_record(&zone.records, desired)
                     && !matches!(desired["type"].as_str(), Some("MX" | "TXT"))
                     && zone
@@ -477,7 +554,11 @@ impl Session {
                 }
             }
             let original = zone.records.clone();
-            for record in &plan.records_to_preserve {
+            for record in plan
+                .records_to_preserve
+                .iter()
+                .chain(plan.records_to_add.iter())
+            {
                 if contains_record(&zone.records, record) {
                     continue;
                 }
@@ -495,13 +576,14 @@ impl Session {
             if !plan
                 .records_to_preserve
                 .iter()
+                .chain(plan.records_to_add.iter())
                 .all(|r| contains_record(&observed, r))
                 || !original.iter().all(|r| contains_record(&observed, r))
             {
                 return Err(error("dns_readback_mismatch"));
             }
             Ok(
-                json!({"zone_id":zone.id,"cloudflare_nameservers":zone.nameservers,"preserved_records":plan.records_to_preserve.len(),"registrar_nameservers_changed":false,"apex_web_records_excluded":true}),
+                json!({"zone_id":zone.id,"cloudflare_nameservers":zone.nameservers,"preserved_records":plan.records_to_preserve.len(),"added_records":plan.records_to_add.len(),"retired_mail_records":plan.records_to_retire.len(),"retire_unused_mail":plan.retire_unused_mail,"registrar_nameservers_changed":false,"apex_web_records_excluded":true}),
             )
         } else {
             let zone = plan
@@ -574,6 +656,9 @@ mod tests {
             },
             zone: None,
             records_to_preserve: vec![],
+            records_to_retire: vec![],
+            records_to_add: vec![],
+            retire_unused_mail: false,
             created_at: 0,
             expires_at: 0,
             nonce: "fixture".into(),
