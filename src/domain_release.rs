@@ -16,6 +16,7 @@ use std::{
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Source {
+    pub source_mode: SourceMode,
     pub domain: String,
     pub registrar_nameservers: Vec<String>,
     pub public_nameservers: Vec<String>,
@@ -26,6 +27,12 @@ pub struct Source {
     pub ttl: u32,
     pub parent_ds_present: bool,
     pub observed_apex_mail: Vec<Value>,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceMode {
+    RegisteredAndPublicObserved,
+    EmptyRegisteredUnserved,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -145,6 +152,7 @@ pub fn source(
     }
     observed_apex_mail.sort_by_key(Value::to_string);
     Ok(Source {
+        source_mode: SourceMode::RegisteredAndPublicObserved,
         domain,
         registrar_nameservers,
         public_nameservers,
@@ -290,6 +298,7 @@ pub struct Session {
     domain: String,
     account: String,
     issued: BTreeMap<String, Plan>,
+    allow_empty_unserved: bool,
 }
 impl Session {
     pub fn new(domain: &str, account: &str) -> Result<Self> {
@@ -300,7 +309,24 @@ impl Session {
             domain: domain_name(domain)?,
             account: account.into(),
             issued: BTreeMap::new(),
+            allow_empty_unserved: false,
         })
+    }
+    pub fn allow_empty_registered_unserved(mut self) -> Self {
+        self.allow_empty_unserved = true;
+        self
+    }
+    fn observed_source(
+        &self,
+        registrar: &mut impl ReadTransport,
+        public: &mut impl ReadTransport,
+    ) -> Result<Source> {
+        match source(registrar, public, &self.domain) {
+            Err(failure) if self.allow_empty_unserved && failure.code == "dns_servfail" => {
+                crate::empty_registered_source::source(registrar, public, &self.domain)
+            }
+            result => result,
+        }
     }
     pub fn observe(
         &self,
@@ -309,7 +335,7 @@ impl Session {
         public: &mut impl ReadTransport,
     ) -> Result<Value> {
         Ok(
-            json!({"source":source(registrar,public,&self.domain)?,"zone":zone_state(dns,&self.account,&self.domain)?,"writes_performed":false}),
+            json!({"source":self.observed_source(registrar,public)?,"zone":zone_state(dns,&self.account,&self.domain)?,"writes_performed":false}),
         )
     }
     pub fn plan(
@@ -322,8 +348,15 @@ impl Session {
         if !matches!(phase, "prepare_zone" | "change_nameservers") {
             return Err(error("invalid_phase"));
         }
-        let source = source(registrar, public, &self.domain)?;
+        let source = self.observed_source(registrar, public)?;
         let zone = zone_state(dns, &self.account, &self.domain)?;
+        if source.source_mode == SourceMode::EmptyRegisteredUnserved
+            && zone
+                .as_ref()
+                .is_some_and(|current| !current.records.is_empty())
+        {
+            return Err(error("empty_target_zone_required"));
+        }
         let records_to_preserve = desired(&source)?;
         if phase == "change_nameservers" {
             if source.parent_ds_present {
@@ -383,7 +416,7 @@ impl Session {
         if now()? >= plan.expires_at || digest(&plan)? != approval {
             return Err(error("expired_or_modified_plan"));
         }
-        if source(registrar, public, &self.domain)? != plan.source
+        if self.observed_source(registrar, public)? != plan.source
             || zone_state(dns, &self.account, &self.domain)? != plan.zone
         {
             return Err(error("snapshot_drift"));
@@ -527,6 +560,7 @@ mod tests {
             domain: "example.test".into(),
             account: account.into(),
             source: Source {
+                source_mode: SourceMode::RegisteredAndPublicObserved,
                 domain: "example.test".into(),
                 registrar_nameservers: vec![],
                 public_nameservers: vec![],

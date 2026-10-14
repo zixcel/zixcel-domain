@@ -404,3 +404,145 @@ fn parent_delegation_drift_consumes_plan_before_cloudflare_writes() {
     assert_eq!(d.posts, 0);
     assert!(session.apply(&hash, &mut r, &mut d, &mut p).is_err());
 }
+
+struct UnservedPublic {
+    ds: bool,
+    mixed: bool,
+}
+impl ReadTransport for UnservedPublic {
+    fn delegation(&mut self, _: &str) -> Result<Vec<String>> {
+        if self.mixed {
+            return Ok(vec!["ns11.value-domain.com".into(), "outside.test".into()]);
+        }
+        Ok([11, 12, 13]
+            .map(|n| format!("ns{n}.value-domain.com"))
+            .to_vec())
+    }
+    fn get(&mut self, path: &str) -> Result<Value> {
+        if !path.ends_with("type=DS") {
+            return Ok(json!({"Status":2}));
+        }
+        let answers = if self.ds {
+            vec![json!({"name":"example.test.","type":43,"TTL":3600,"data":"1 1 1 deadbeef"})]
+        } else {
+            vec![]
+        };
+        Ok(
+            json!({"Status":0,"TC":false,"Question":[{"name":"example.test.","type":43}],"Answer":answers}),
+        )
+    }
+}
+fn empty_fixture() -> (Registrar, Dns, UnservedPublic) {
+    let mut registrar = Registrar::new();
+    registrar.ns = [11, 12, 13]
+        .map(|n| format!("ns{n}.value-domain.com"))
+        .to_vec();
+    registrar.records = String::new();
+    registrar.dns_type = "valuedomain11".into();
+    (
+        registrar,
+        Dns::new(),
+        UnservedPublic {
+            ds: false,
+            mixed: false,
+        },
+    )
+}
+#[test]
+fn unserved_dns_requires_explicit_empty_registered_policy() {
+    let (mut r, mut d, mut p) = empty_fixture();
+    let mut session = Session::new("example.test", ACCOUNT).unwrap();
+    assert_eq!(
+        session
+            .plan("prepare_zone", &mut r, &mut d, &mut p)
+            .unwrap_err()
+            .code,
+        "dns_servfail"
+    );
+    assert_eq!(d.posts + r.puts, 0);
+}
+#[test]
+fn empty_registered_policy_plans_and_applies_without_claiming_public_dns_observation() {
+    let (mut r, mut d, mut p) = empty_fixture();
+    let mut session = Session::new("example.test", ACCOUNT)
+        .unwrap()
+        .allow_empty_registered_unserved();
+    let plan = session
+        .plan("prepare_zone", &mut r, &mut d, &mut p)
+        .unwrap();
+    assert_eq!(
+        plan["plan"]["source"]["source_mode"],
+        "empty_registered_unserved"
+    );
+    assert_eq!(plan["plan"]["source"]["public_soa"], "");
+    let hash = plan["sha256"].as_str().unwrap();
+    assert_eq!(
+        session.apply(hash, &mut r, &mut d, &mut p).unwrap()["status"],
+        "provider_verified"
+    );
+    let plan = session
+        .plan("change_nameservers", &mut r, &mut d, &mut p)
+        .unwrap();
+    let hash = plan["sha256"].as_str().unwrap();
+    let result = session.apply(hash, &mut r, &mut d, &mut p).unwrap();
+    assert_eq!(result["status"], "provider_verified");
+    assert_eq!(
+        result["result"]["public_propagation"],
+        "pending_separate_verification"
+    );
+    assert_eq!(r.puts, 1);
+    assert_eq!(
+        session
+            .apply(hash, &mut r, &mut d, &mut p)
+            .unwrap_err()
+            .code,
+        "unissued_or_consumed_plan"
+    );
+}
+#[test]
+fn empty_policy_refuses_records_dnssec_mixed_delegation_and_populated_target() {
+    for case in 0..4 {
+        let (mut r, mut d, mut p) = empty_fixture();
+        match case {
+            0 => r.records = "mx mail 10".into(),
+            1 => p.ds = true,
+            2 => p.mixed = true,
+            _ => {
+                d.present = true;
+                d.records.push(
+                    json!({"id":ZONE,"type":"TXT","name":"example.test","content":"existing"}),
+                );
+            }
+        }
+        let mut session = Session::new("example.test", ACCOUNT)
+            .unwrap()
+            .allow_empty_registered_unserved();
+        assert!(
+            session
+                .plan("prepare_zone", &mut r, &mut d, &mut p)
+                .is_err()
+        );
+        assert_eq!(d.posts + r.puts, 0);
+    }
+}
+#[test]
+fn empty_source_drift_consumes_plan_without_writes() {
+    let (mut r, mut d, mut p) = empty_fixture();
+    let mut session = Session::new("example.test", ACCOUNT)
+        .unwrap()
+        .allow_empty_registered_unserved();
+    let plan = session
+        .plan("prepare_zone", &mut r, &mut d, &mut p)
+        .unwrap();
+    r.records = "txt changed".into();
+    let hash = plan["sha256"].as_str().unwrap();
+    assert!(session.apply(hash, &mut r, &mut d, &mut p).is_err());
+    assert_eq!(d.posts + r.puts, 0);
+    assert_eq!(
+        session
+            .apply(hash, &mut r, &mut d, &mut p)
+            .unwrap_err()
+            .code,
+        "unissued_or_consumed_plan"
+    );
+}

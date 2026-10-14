@@ -207,3 +207,29 @@ that delegation is preferred. The separate FreeDNS export (`GET /freedns/{domain
 is used for delegated ns1..ns5 only when the registered namespace does not match.
 A registrar storage snapshot alone is not authoritative evidence. See
 [the API distinction and bounded delegation checks](docs/valuedomain-dns-api.md).
+
+## Empty registered domains with SERVFAIL (0.3)
+
+The default migration still requires public DNS observations. For a new domain
+whose registered ValueDomain DNS is empty and public DNS returns SERVFAIL, the
+owner can explicitly start a scoped session with
+`--allow-empty-registered-unserved`. This is not an empty authoritative export:
+plans identify `source_mode: empty_registered_unserved`, leave public SOA/mail
+observations unavailable, and use the owner's empty registered configuration.
+
+Admission requires authenticated domain inventory, an empty `valuedomain11`
+configuration, matching registrar and direct-parent ns11/ns12/ns13 delegation,
+no observed parent DS, and no pre-existing target-zone records. Nonempty source,
+mixed delegation, unknown DNS errors, DNSSEC or target data are rejected. Inputs
+are re-read before each one-use hash applies; drift consumes the plan without a
+write. NS updates still require separate propagation/Cloudflare/HTTPS acceptance.
+This source-mode addition uses a new minor CLI/library version, not a silent
+relaxation of existing sessions. Provider credentials never enter the plan.
+
+For owner-selected domains, `playground/domain-batch-local.sh ACCOUNT DOMAIN...`
+enters existing credentials once and opens one narrowly scoped session at a time.
+It advances only after the operator closes the current session explicitly;
+expiry or failure stops the batch. An optional
+`--allow-empty-registered-unserved` before the domain list explicitly selects the
+empty-domain policy. It does not auto-apply plans or bypass hash, DNSSEC, source,
+account or target-zone checks. Each session keeps the original 20-minute limit.

@@ -21,6 +21,12 @@ fn run(args: &[String]) -> Result<serde_json::Value> {
             "write_boundary": "scoped_local_session_one_use_plan_hash_approval"
         }),
         #[cfg(unix)]
+        [command, socket, domain, account, flag]
+            if command == "domain-session" && flag == "--allow-empty-registered-unserved" =>
+        {
+            zixcel_domain::domain_session::serve_with_policy(socket, domain, account, true)?
+        }
+        #[cfg(unix)]
         [command, socket, domain, account] if command == "domain-session" => {
             zixcel_domain::domain_session::serve(socket, domain, account)?
         }
