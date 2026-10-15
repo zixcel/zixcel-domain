@@ -257,3 +257,8 @@ domain must be in that list; other selected domains retain the preserve policy.
 This option can be combined with `--allow-empty-registered-unserved`. Version
 0.4.0 adds these policy/plan fields; no previous issued plan is accepted by a new
 session.
+
+
+## タグからの独立リリース
+
+Cargo.tomlのversionを更新してmain CIの成功を待ち、同じcommitへ `v<version>` タグをpushします。`.github/tag-release.json` がowner・version正本・必須CIを宣言し、タグがmainの履歴に属することと同じSHAのCI成功を確認してから既存のstatic Linux build/test/hash付きGitHub Releaseへ進みます。中央管理repoのcheckout、Cloudflare/ValueDomainの資格情報、他組織のprivate sourceは不要です。crate registry公開とは別経路で、既存のpublish設定は変更しません。
