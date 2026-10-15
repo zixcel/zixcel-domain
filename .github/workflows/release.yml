@@ -1,62 +1,125 @@
 name: Release binary
-on:
-  push:
-    tags: ['v*']
 permissions:
   contents: read
 jobs:
-  release:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+    - run: python3 .github/scripts/test_source_admission.py
+  prepare:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
-      contents: write
+      contents: read
       actions: read
     env:
       ZIXCEL_DOMAIN_SOURCE_SHA: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - name: Admit owned version tag and exact successful main CI
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python3 .github/scripts/source_admission.py
-      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249
-        with:
-          toolchain: '1.97.1'
-          targets: x86_64-unknown-linux-musl
-          components: rustfmt, clippy
-      - name: Verify source and tag version
-        run: |
-          set -euo pipefail
-          version="$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')"
-          test "$GITHUB_REF_NAME" = "v$version"
-          cargo fmt --all --check
-          cargo test --locked
-          cargo clippy --locked --all-targets -- -D warnings
-      - name: Build static Linux binary
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends musl-tools
-          cargo build --locked --release --target x86_64-unknown-linux-musl
-      - name: Package and smoke test
-        run: |
-          set -euo pipefail
-          binary=target/x86_64-unknown-linux-musl/release/zixcel-domain
-          "$binary" version
-          "$binary" capabilities
-          "$binary" validate-bindings < playground/bindings.json
-          name="zixcel-domain-${GITHUB_REF_NAME}-linux-x86_64"
-          mkdir -p "release/$name"
-          cp "$binary" LICENSE NOTICE README.md "release/$name/"
-          tar -czf "release/$name.tar.gz" -C release "$name"
-          cd release
-          sha256sum "$name.tar.gz" > SHA256SUMS
-      - name: Publish GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "$GITHUB_REF_NAME" release/*.tar.gz release/SHA256SUMS \
-            --verify-tag --title "zixcel-domain $GITHUB_REF_NAME" \
-            --notes 'Linux/WSL x86_64 domain inventory and scoped DNS migration sessions. Writes require an issued one-use plan hash in a private local session. No token creation or site deployment. Built and tested from the tagged source by GitHub Actions.'
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        fetch-depth: 0
+    - name: Admit owned version tag and exact successful main CI
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: python3 .github/scripts/source_admission.py
+    - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249
+      with:
+        toolchain: 1.97.1
+        targets: x86_64-unknown-linux-musl
+        components: rustfmt, clippy
+    - name: Verify source and tag version
+      run: |
+        set -euo pipefail
+        version="$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')"
+        test "$GITHUB_REF_NAME" = "v$version"
+        cargo fmt --all --check
+        cargo test --locked
+        cargo clippy --locked --all-targets -- -D warnings
+    - name: Build static Linux binary
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends musl-tools
+        cargo build --locked --release --target x86_64-unknown-linux-musl
+    - name: Package and smoke test
+      run: |
+        set -euo pipefail
+        binary=target/x86_64-unknown-linux-musl/release/zixcel-domain
+        "$binary" version
+        "$binary" capabilities
+        "$binary" validate-bindings < playground/bindings.json
+        name="zixcel-domain-${GITHUB_REF_NAME}-linux-x86_64"
+        mkdir -p "release/$name"
+        cp "$binary" LICENSE NOTICE README.md "release/$name/"
+        tar -czf "release/$name.tar.gz" -C release "$name"
+        cd release
+        sha256sum "$name.tar.gz" > SHA256SUMS
+
+        echo "sha256=$(sha256sum "$name.tar.gz" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      id: digest
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      id: upload
+      with:
+        name: binary-release-${{ github.sha }}-${{ github.run_attempt }}
+        path: |-
+          release/*.tar.gz
+          release/SHA256SUMS
+        retention-days: 90
+        if-no-files-found: error
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: contract
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      archive-sha256: ${{ steps.digest.outputs.sha256 }}
+  publish:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      with:
+        artifact-ids: ${{ needs.prepare.outputs.artifact-id }}
+        merge-multiple: true
+        path: ${{ runner.temp }}/binary-release
+    - name: Publish and read back immutable archive without executing build code
+      env:
+        GH_TOKEN: ${{ github.token }}
+        EXPECTED_ARCHIVE: ${{ needs.prepare.outputs.archive-sha256 }}
+      run: |
+        set -euo pipefail
+        cd "$RUNNER_TEMP/binary-release"
+        name="zixcel-domain-${GITHUB_REF_NAME}-linux-x86_64.tar.gz"
+        test "$(sha256sum "$name" | cut -d' ' -f1)" = "$EXPECTED_ARCHIVE"
+        sha256sum --check SHA256SUMS
+        if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" > "$RUNNER_TEMP/existing-release.json" 2> "$RUNNER_TEMP/release-error"; then
+          echo 'Existing release: verify only; never overwrite.'
+        else
+          grep -q '(HTTP 404)' "$RUNNER_TEMP/release-error" || exit 1
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          gh release create "$GITHUB_REF_NAME" "$name" SHA256SUMS --repo "$GITHUB_REPOSITORY" \
+            --verify-tag --target "$GITHUB_SHA" --title "zixcel-domain $GITHUB_REF_NAME" \
+            --notes 'Linux/WSL static binary built and tested from owned version tag by GitHub Actions. No provider credentials are used.'
+        fi
+        mkdir "$RUNNER_TEMP/published-readback"
+        gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern "$name" --dir "$RUNNER_TEMP/published-readback"
+        test "$(sha256sum "$RUNNER_TEMP/published-readback/$name" | cut -d' ' -f1)" = "$EXPECTED_ARCHIVE"
+        printf 'Verified source `%s` archive SHA256 `%s`.\n' "$GITHUB_SHA" "$EXPECTED_ARCHIVE" >> "$GITHUB_STEP_SUMMARY"
+'on':
+  push:
+    tags:
+    - v*
+  pull_request:
+    paths:
+    - .github/workflows/release.yml
+    - .github/scripts/source_admission.py
+    - .github/scripts/test_source_admission.py
+    - .github/tag-release.json
+concurrency:
+  group: binary-release-${{ github.repository }}
+  cancel-in-progress: false
