@@ -1,0 +1,8 @@
+{
+  "repository": "zixcel/zixcel-domain",
+  "defaultBranch": "main",
+  "versionFile": "Cargo.toml",
+  "requiredWorkflows": [
+    "ci.yml"
+  ]
+}
