@@ -1,4 +1,5 @@
 //! Scoped, one-use DNS migration plans. Credentials remain in trusted transports.
+use crate::approval::now;
 use crate::{
     Result, cloudflare, dns_import, domain_name, error, public_dns,
     transport::{ReadTransport, WriteTransport},
@@ -7,11 +8,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::{
-    collections::BTreeMap,
-    io::Read,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -66,12 +63,6 @@ pub fn digest(value: &impl Serialize) -> Result<String> {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect())
-}
-fn now() -> Result<u64> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|v| v.as_secs())
-        .map_err(|_| error("invalid_clock"))
 }
 fn sorted(mut names: Vec<String>) -> Vec<String> {
     names.sort();
@@ -444,10 +435,6 @@ impl Session {
             }
         }
         let created_at = now()?;
-        let mut nonce = [0_u8; 32];
-        std::fs::File::open("/dev/urandom")
-            .and_then(|mut f| f.read_exact(&mut nonce))
-            .map_err(|_| error("nonce_failed"))?;
         let plan = Plan {
             implementation_version: env!("CARGO_PKG_VERSION").into(),
             implementation_source_sha: option_env!("ZIXCEL_DOMAIN_SOURCE_SHA").map(str::to_owned),
@@ -462,7 +449,7 @@ impl Session {
             retire_unused_mail: self.retire_unused_mail,
             created_at,
             expires_at: created_at + 600,
-            nonce: nonce.iter().map(|x| format!("{x:02x}")).collect(),
+            nonce: crate::approval::nonce()?,
         };
         if serde_json::to_vec(&plan)
             .map_err(|_| error("invalid_plan"))?

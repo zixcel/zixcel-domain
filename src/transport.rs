@@ -45,10 +45,16 @@ pub trait WriteTransport: ReadTransport {
     fn put(&mut self, path: &str, body: &Value) -> Result<Value>;
 }
 
+/// Additional DNS-record methods; existing migration transports need no new authority.
+pub trait RecordWriteTransport: WriteTransport {
+    fn patch(&mut self, path: &str, body: &Value) -> Result<Value>;
+    fn delete(&mut self, path: &str) -> Result<Value>;
+}
+
 pub struct HttpTransport {
     client: Client,
     authorization: Option<HeaderValue>,
-    provider: Provider,
+    pub(crate) provider: Provider,
     deadline: Instant,
     requests_left: usize,
     bytes_left: usize,
@@ -80,6 +86,7 @@ impl HttpTransport {
     fn new(provider: Provider, authorization: Option<HeaderValue>) -> Result<Self> {
         let client = Client::builder()
             .redirect(reqwest::redirect::Policy::none())
+            .retry(reqwest::retry::never())
             .timeout(Duration::from_secs(15))
             .connect_timeout(Duration::from_secs(5))
             .no_proxy()
@@ -115,7 +122,7 @@ impl ReadTransport for HttpTransport {
     }
 }
 impl HttpTransport {
-    fn request(
+    pub(crate) fn request(
         &mut self,
         method: reqwest::Method,
         path: &str,
@@ -201,3 +208,7 @@ impl WriteTransport for HttpTransport {
             .map_err(|error| error.with_context(self.provider.name(), "http_put"))
     }
 }
+
+#[cfg(test)]
+#[path = "transport_record_tests.rs"]
+mod record_tests;

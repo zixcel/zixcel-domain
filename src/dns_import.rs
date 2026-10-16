@@ -26,7 +26,7 @@ pub struct SrvData {
     pub target: String,
 }
 
-fn owner(zone: &str, input: &str) -> Result<String> {
+pub(crate) fn owner(zone: &str, input: &str) -> Result<String> {
     let name = if input == "@" {
         zone.to_owned()
     } else if input.ends_with('.') {

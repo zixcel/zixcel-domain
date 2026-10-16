@@ -1,4 +1,5 @@
 //! Local registrar/DNS inventory. Credentials never enter the inventory model.
+mod approval;
 pub mod cloudflare;
 pub mod delegation;
 pub mod dns_import;
@@ -9,6 +10,12 @@ mod empty_registered_source;
 pub mod inspection;
 pub mod mapping;
 pub mod public_dns;
+mod record_change;
+mod record_data;
+pub mod record_editor;
+mod record_execution;
+mod record_http;
+mod record_snapshot;
 pub mod transport;
 pub mod valuedomain;
 
