@@ -34,17 +34,20 @@ impl Edit {
             Self::Delete { .. } => None,
         }
     }
-    pub(crate) fn normalize(mut self, scope: &Scope) -> Result<Self> {
+    pub(crate) fn normalize(self, scope: &Scope) -> Result<Self> {
         if self.id().is_some_and(|v| !valid_id(v)) {
             return Err(error("invalid_record_id"));
         }
-        match &mut self {
-            Self::Create { record } | Self::Update { record, .. } => {
-                *record = record.clone().normalize(&scope.domain)?
-            }
-            Self::Delete { .. } => (),
-        }
-        Ok(self)
+        Ok(match self {
+            Self::Create { record } => Self::Create {
+                record: record.normalize(&scope.domain)?,
+            },
+            Self::Update { record_id, record } => Self::Update {
+                record_id,
+                record: record.normalize(&scope.domain)?,
+            },
+            Self::Delete { record_id } => Self::Delete { record_id },
+        })
     }
     pub(crate) fn validate(&self, snapshot: &Snapshot) -> Result<()> {
         if let Some(id) = self.id() {

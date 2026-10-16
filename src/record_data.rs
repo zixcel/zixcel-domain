@@ -26,6 +26,9 @@ pub struct RecordData {
 }
 impl RecordData {
     pub(crate) fn normalize(mut self, domain: &str) -> Result<Self> {
+        if self.name.len() > 254 || self.content.len() > 2048 {
+            return Err(error("invalid_record_data"));
+        }
         self.name = dns_import::owner(domain, &format!("{}.", self.name.trim_end_matches('.')))?;
         if !(self.ttl == 1 || (60..=86400).contains(&self.ttl))
             || self.content.is_empty()

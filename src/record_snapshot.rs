@@ -11,7 +11,7 @@ pub struct Scope {
 }
 impl Scope {
     pub(crate) fn validate(mut self) -> Result<Self> {
-        if !valid_id(&self.account) || !valid_id(&self.zone) {
+        if !valid_id(&self.account) || !valid_id(&self.zone) || self.domain.len() > 1024 {
             return Err(error("invalid_scope"));
         }
         self.account.make_ascii_lowercase();
