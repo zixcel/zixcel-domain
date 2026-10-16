@@ -1,7 +1,8 @@
-# Scoped DNS record CLI (private review candidate)
+# Scoped DNS record CLI
 
-This is the CLI unit of coela-release #148. The public owner and release remain
-unchanged. No live provider, token, DNS change or distribution is accepted here.
+This is the source implementation of the scoped DNS record CLI. Development
+acceptance uses synthetic providers; it does not verify live token permissions,
+change DNS or update the published binary.
 
 Build with the existing Rust toolchain: `cargo build --locked`.
 Run `zixcel-domain record-session ACCOUNT_ID ZONE_ID example.test` from a trusted
@@ -57,6 +58,6 @@ closed input schemas and request/byte bounds. These sockets are test plumbing,
 not a new production socket service. A CLI subprocess verifies capability output
 and scope validation before credentials. No live HTTP write is performed.
 
-The review repository is private, Actions disabled, Secrets empty and scheduled
-dependency configuration omitted. Public reflection requires separate review;
-do not copy this private policy/history into the public source owner.
+The source was reviewed privately before public reflection. Private review
+settings and history are not part of this implementation. Distribution and live
+provider acceptance remain separate release and operational steps.
