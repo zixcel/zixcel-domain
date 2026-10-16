@@ -15,10 +15,12 @@ fn run(args: &[String]) -> Result<serde_json::Value> {
         }),
         [command] if command == "capabilities" => serde_json::json!({
             "schema_version": 1, "registrar": "valuedomain-v2", "dns": "cloudflare",
-            "operations": ["inventory", "inspect", "mapping-preview", "dns-source-preview", "dns-import-preview", "public-dns", "public-nameservers", "public-delegation", "valuedomain-domains", "valuedomain-settings", "valuedomain-free-dns", "valuedomain-nameservers", "domain-session", "domain-control", "cloudflare-zones", "cloudflare-records", "validate-bindings"],
+            "operations": ["inventory", "inspect", "mapping-preview", "dns-source-preview", "dns-import-preview", "public-dns", "public-nameservers", "public-delegation", "valuedomain-domains", "valuedomain-settings", "valuedomain-free-dns", "valuedomain-nameservers", "domain-session", "domain-control", "record-session", "cloudflare-zones", "cloudflare-records", "validate-bindings"],
             "writes_supported": true, "live_acceptance": false,
-            "write_operations": ["prepare_zone", "change_nameservers"],
-            "write_boundary": "scoped_local_session_one_use_plan_hash_approval"
+            "write_operations": ["prepare_zone", "change_nameservers", "record_create", "record_update", "record_delete"],
+            "record_session": {"command":"record-session", "protocol":1, "record_types":["A","AAAA","CNAME","TXT","MX"], "actions":["plan","apply","status","stop"], "request_bytes":8192, "response_bytes":1048576, "request_limit":100},
+            "write_boundary": "scoped_local_session_one_use_plan_hash_approval",
+            "token_permissions_verified": false
         }),
         #[cfg(unix)]
         [command, socket, domain, account, flags @ ..] if command == "domain-session" => {
@@ -203,6 +205,29 @@ fn run(args: &[String]) -> Result<serde_json::Value> {
 
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
+    if let [command, account, zone, domain] = args.as_slice()
+        && command == "record-session"
+    {
+        let result = (|| -> Result<()> {
+            let scope = zixcel_domain::record_editor::Scope {
+                account: account.clone(),
+                zone: zone.clone(),
+                domain: domain.clone(),
+            };
+            zixcel_domain::record_editor::Editor::new(scope.clone())?;
+            zixcel_domain::record_cli::serve_live(
+                scope,
+                std::io::stdin().lock(),
+                std::io::stdout().lock(),
+            )
+        })();
+        if let Err(error) = result {
+            let value = serde_json::json!({"schema_version":1,"error":error});
+            let _ = writeln!(std::io::stdout().lock(), "{value}");
+            std::process::exit(1);
+        }
+        return;
+    }
     let (value, code) = match run(&args) {
         Ok(value) => {
             let code = if value["result"]["complete_for_dns_plan"].as_bool() == Some(false)

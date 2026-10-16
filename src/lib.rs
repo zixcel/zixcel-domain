@@ -11,6 +11,7 @@ pub mod inspection;
 pub mod mapping;
 pub mod public_dns;
 mod record_change;
+pub mod record_cli;
 mod record_data;
 pub mod record_editor;
 mod record_execution;
