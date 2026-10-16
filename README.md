@@ -2,9 +2,11 @@
 
 One Rust crate owns the library,
 provider adapters and JSON CLI; NERP and Codex can consume the same implementation.
-The 0.1 releases provide account inventory and offline previews. Version 0.2 adds
-scoped local DNS migration sessions with one-use plan approvals. NERP integration,
-registry publication and deployment acceptance remain separate work.
+It provides account inventory, offline previews and scoped local DNS migration
+sessions with one-use plan approvals. The [record editing library](docs/record-editor.md)
+adds separately reviewed A/AAAA/CNAME/TXT/MX changes. That library source is not yet
+part of an accepted released binary or NERP UI. Registry publication and deployment
+acceptance remain separate work.
 
 The library implements bounded ValueDomain v2 inventory,
 registrar NS/stored DNS inspection, Cloudflare account-scoped zone and record
