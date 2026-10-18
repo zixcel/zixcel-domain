@@ -1,0 +1,48 @@
+name: Native provider contracts
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  native-provider:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249
+        with:
+          toolchain: 1.97.1
+          components: rustfmt, clippy
+          targets: x86_64-unknown-linux-musl
+      - run: cargo fmt --all --check
+      - run: cargo test --locked --workspace --all-targets --all-features
+      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - name: Prepare static native candidate without publication
+        env:
+          ZIX_RELEASE_SOURCE: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends musl-tools
+          cargo build --locked --release -p zixcel-domain --bin zix-domain --target x86_64-unknown-linux-musl
+          cargo run --locked -p zixcel-domain --bin package-native -- "$PWD/target/x86_64-unknown-linux-musl/release/zix-domain" "$RUNNER_TEMP/native" x86_64-unknown-linux-musl
+          cd "$RUNNER_TEMP/native"
+          sha256sum --check SHA256SUMS
+          mkdir unpacked
+          tar -xzf ./*.tar.gz -C unpacked
+          cd unpacked/*
+          sha256sum --check CONTENTS.sha256
+          ./zix-domain --manifest > observed-manifest.json
+          cmp observed-manifest.json domain.extension.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-provider-linux-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/native/*.tar.gz
+            ${{ runner.temp }}/native/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30

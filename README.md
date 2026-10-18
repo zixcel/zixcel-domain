@@ -264,3 +264,9 @@ session.
 ## タグからの独立リリース
 
 Cargo.tomlのversionを更新してmain CIの成功を待ち、同じcommitへ `v<version>` タグをpushします。`.github/tag-release.json` がowner・version正本・必須CIを宣言し、タグがmainの履歴に属することと同じSHAのCI成功を確認してから既存のstatic Linux build/test/hash付きGitHub Releaseへ進みます。中央管理repoのcheckout、Cloudflare/ValueDomainの資格情報、他組織のprivate sourceは不要です。crate registry公開とは別経路で、既存のpublish設定は変更しません。
+
+## Common Zix entry
+
+[Native read adapter](docs/native-zix.md) reuses ValueDomain inventory and renewal
+filtering through `zix domain list`. This is source-only until native artifact
+acceptance; the existing standalone CLI and DNS execution path remain separate.

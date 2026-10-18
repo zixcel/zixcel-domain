@@ -9,6 +9,7 @@ pub mod domain_session;
 mod empty_registered_source;
 pub mod inspection;
 pub mod mapping;
+pub mod native;
 pub mod public_dns;
 mod record_change;
 pub mod record_cli;
