@@ -28,8 +28,10 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends musl-tools
-          cargo build --locked --release -p zixcel-domain --bin zix-domain --target x86_64-unknown-linux-musl
-          cargo run --locked -p zixcel-domain --bin package-native -- "$PWD/target/x86_64-unknown-linux-musl/release/zix-domain" "$RUNNER_TEMP/native" x86_64-unknown-linux-musl
+          cargo build --locked --release -p zixcel-domain-cli --bin zix-domain --target x86_64-unknown-linux-musl
+          cargo run --locked -p zixcel-domain-cli --bin package-native -- "$PWD/target/x86_64-unknown-linux-musl/release/zix-domain" "$RUNNER_TEMP/native" x86_64-unknown-linux-musl
+          cargo run --locked -p zixcel-domain-cli --bin package-notices -- "$RUNNER_TEMP/legacy-notices"
+          cmp tools/native-release/notices/jni-0.22.4/LICENSE-MIT "$RUNNER_TEMP/legacy-notices/THIRD-PARTY/jni-0.22.4/LICENSE-MIT"
           cd "$RUNNER_TEMP/native"
           sha256sum --check SHA256SUMS
           mkdir unpacked

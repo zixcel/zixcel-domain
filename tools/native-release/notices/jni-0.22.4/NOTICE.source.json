@@ -1,0 +1,20 @@
+{
+  "package": "jni",
+  "version": "0.22.4",
+  "declared_license": "MIT OR Apache-2.0",
+  "source_commit": "5ae9458a4ec44c5318f37ddc7569c1d4ae8a69e7",
+  "commit_evidence": "official crate .cargo_vcs_info.json",
+  "reason": "The published crate omits workspace-root license files; retain originals from the exact upstream commit.",
+  "files": [
+    {
+      "file": "LICENSE-APACHE",
+      "url": "https://raw.githubusercontent.com/jni-rs/jni-rs/5ae9458a4ec44c5318f37ddc7569c1d4ae8a69e7/LICENSE-APACHE",
+      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+    },
+    {
+      "file": "LICENSE-MIT",
+      "url": "https://raw.githubusercontent.com/jni-rs/jni-rs/5ae9458a4ec44c5318f37ddc7569c1d4ae8a69e7/LICENSE-MIT",
+      "sha256": "fea1d5bf3dd71605ce5d7d2ff695c1837e914c77195e523a86b5391716477960"
+    }
+  ]
+}

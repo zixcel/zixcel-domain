@@ -55,6 +55,7 @@ jobs:
         name="zixcel-domain-${GITHUB_REF_NAME}-linux-x86_64"
         mkdir -p "release/$name"
         cp "$binary" LICENSE NOTICE README.md "release/$name/"
+        cargo run --locked -p zixcel-domain-cli --bin package-notices -- "release/$name"
         tar -czf "release/$name.tar.gz" -C release "$name"
         cd release
         sha256sum "$name.tar.gz" > SHA256SUMS

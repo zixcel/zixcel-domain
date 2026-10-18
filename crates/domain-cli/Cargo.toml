@@ -1,0 +1,22 @@
+[package]
+name = "zixcel-domain-cli"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+license = "Apache-2.0"
+repository = "https://github.com/zixcel/zixcel-domain"
+description = "Bounded zix protocol adapter over ValueDomain inventory"
+publish = false
+[[bin]]
+name = "zix-domain"
+path = "src/main.rs"
+[dependencies]
+zixcel-domain = { path = "../.." }
+zix-native-provider = { git = "https://github.com/zixcel/cli", rev = "d8fc1af5031ab999b24ce6eb07d7d45c7f7f62c8" }
+serde_json = "1"
+[dev-dependencies]
+sha2 = "0.11"
+[lints.rust]
+unsafe_code = "forbid"
+[lints.clippy]
+all = "warn"

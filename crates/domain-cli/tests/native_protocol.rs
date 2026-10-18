@@ -1,6 +1,7 @@
 use serde_json::{Value, json};
 use zix_native_provider::Request;
-use zixcel_domain::{Result, native, transport::ReadTransport};
+use zixcel_domain::{Result, transport::ReadTransport};
+use zixcel_domain_cli as native;
 fn request() -> Request {
     serde_json::from_value(json!({"schema":"zix-provider/v1","id":"0".repeat(32),"operation":"valuedomain.domains.list",
     "arguments":{},"limits":{"timeout_ms":5000,"maximum_response_bytes":65536}})).unwrap()

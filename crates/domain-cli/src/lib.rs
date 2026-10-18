@@ -1,14 +1,14 @@
 //! zix protocol adapter over existing ValueDomain inventory, never a second DNS client.
-use crate::{
+use serde_json::{Value, json};
+use zix_native_provider::{Argument, Command, Error, Failure, Manifest, Request, validate_request};
+use zixcel_domain::{
     transport::{HttpTransport, Provider, ReadTransport},
     valuedomain,
 };
-use serde_json::{Value, json};
-use zix_native_provider::{Argument, Command, Error, Failure, Manifest, Request, validate_request};
 pub fn manifest() -> Manifest {
     Manifest {
         schema: "zix-extension/v1".into(),
-        package: "zixcel-domain".into(),
+        package: "zixcel-domain-cli".into(),
         version: env!("CARGO_PKG_VERSION").into(),
         namespace: "domain".into(),
         platform: "linux-x86_64".into(),
@@ -41,7 +41,7 @@ fn exclude(request: &Request) -> Result<bool, Failure> {
         _ => Err(Error("invalid_renewal_filter").into()),
     }
 }
-fn failure(error: crate::Error) -> Failure {
+fn failure(error: zixcel_domain::Error) -> Failure {
     Failure {
         code: error.code,
         http_status: error.http_status,

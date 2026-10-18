@@ -5,7 +5,7 @@ existing inventory/renewal library. The existing `zixcel-domain` CLI, DNS editin
 and one-use migration plans keep their own interfaces. No second registrar
 client or schema interpretation is introduced.
 
-Build with the current Rust toolchain: `cargo build --locked --bin zix-domain`.
+Build with the current Rust toolchain: `cargo build --locked -p zixcel-domain-cli --bin zix-domain`.
 Read `zix-domain --manifest`, then register verified manifest/binary hashes in
 Zix. `zix domain list --exclude-auto-renew-disabled true` reuses the existing
 strict page consistency and effective-renewal checks. Credentials are only
@@ -20,3 +20,11 @@ synthetic data and missing-credential checks, and prepares an unsigned review
 candidate with notices/checksums. Source acceptance, native tag protection,
 formal distribution and real-account validation are separate. No DNS, credential
 or registry operation is performed by source tests.
+
+The adapter lives in `crates/domain-cli` as a separate source-only package.
+The registrar/DNS library keeps its existing Cargo packaging independently.
+
+Original JNI license files omitted by their crate archives are retained under
+`tools/native-release/notices`, with exact upstream commit/URL/hash provenance.
+Both the native candidate and the existing standalone release workflow use the
+same fail-closed notice collector; existing release bytes are not rewritten.

@@ -1769,7 +1769,7 @@ dependencies = [
 [[package]]
 name = "zix-cli"
 version = "0.2.0"
-source = "git+https://github.com/zixcel/cli?rev=c0d0c04eaa17b55491144a52d918810baf2f53a6#c0d0c04eaa17b55491144a52d918810baf2f53a6"
+source = "git+https://github.com/zixcel/cli?rev=d8fc1af5031ab999b24ce6eb07d7d45c7f7f62c8#d8fc1af5031ab999b24ce6eb07d7d45c7f7f62c8"
 dependencies = [
  "crowsi-process-adapter",
  "rustix",
@@ -1785,7 +1785,7 @@ dependencies = [
 [[package]]
 name = "zix-native-provider"
 version = "0.1.0"
-source = "git+https://github.com/zixcel/cli?rev=c0d0c04eaa17b55491144a52d918810baf2f53a6#c0d0c04eaa17b55491144a52d918810baf2f53a6"
+source = "git+https://github.com/zixcel/cli?rev=d8fc1af5031ab999b24ce6eb07d7d45c7f7f62c8#d8fc1af5031ab999b24ce6eb07d7d45c7f7f62c8"
 dependencies = [
  "crowsi-provider-read-http",
  "serde",
@@ -1815,7 +1815,16 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "zixcel-domain-cli"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "sha2",
  "zix-native-provider",
+ "zixcel-domain",
 ]
 
 [[package]]
