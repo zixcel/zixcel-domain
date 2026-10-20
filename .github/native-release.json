@@ -1,0 +1,6 @@
+{
+  "repository": "zixcel/zixcel-domain",
+  "package": "zixcel-domain-cli",
+  "tag_prefix": "native/domain/v",
+  "workflow": "native-provider.yml"
+}
