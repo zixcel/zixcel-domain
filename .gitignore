@@ -1,3 +1,6 @@
 /target/
 /.local/
 .env*
+
+__pycache__/
+*.pyc

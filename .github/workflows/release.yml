@@ -78,6 +78,7 @@ jobs:
       archive-sha256: ${{ steps.digest.outputs.sha256 }}
   publish:
     needs: prepare
+    environment: native-public
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
