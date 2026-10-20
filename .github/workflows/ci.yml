@@ -17,6 +17,10 @@ jobs:
           components: rustfmt, clippy
       - run: python3 .github/scripts/test_source_admission.py
       - run: cargo fmt --all --check
+      - name: Audit locked dependencies
+        run: |
+          cargo install cargo-audit --version 0.22.2 --locked --no-default-features
+          cargo audit --deny warnings
       - run: cargo test --locked
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo package --locked --allow-dirty
