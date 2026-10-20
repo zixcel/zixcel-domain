@@ -4,9 +4,10 @@ One Rust crate owns the library,
 provider adapters and JSON CLI; NERP and Codex can consume the same implementation.
 It provides account inventory, offline previews and scoped local DNS migration
 sessions with one-use plan approvals. The [record editing library](docs/record-editor.md)
-adds separately reviewed A/AAAA/CNAME/TXT/MX changes. That library source is not yet
-part of an accepted released binary or NERP UI. Registry publication and deployment
-acceptance remain separate work.
+and [record-session CLI](docs/record-cli.md) provide separately reviewed
+A/AAAA/CNAME/TXT/MX changes. The standalone CLI release includes that session.
+The independently versioned native `zix domain` adapter provides inventory only;
+its release does not enable DNS writes or a NERP UI.
 
 The library implements bounded ValueDomain v2 inventory,
 registrar NS/stored DNS inspection, Cloudflare account-scoped zone and record
@@ -115,8 +116,9 @@ identifiers are synthetic; real profiles and observations belong outside source.
 
 Live HTTPS origins are fixed. Redirects and ambient proxies are disabled. Budgets:
 90 seconds per transport, 15 seconds per request, 100 requests, 1 MiB per response,
-8 MiB aggregate. Cancellation currently means terminating the CLI; no write can
-be started. Partial inventory pages, duplicate identifiers, inconsistent totals,
+8 MiB aggregate. Inventory commands do not write. Record-session EOF/stop/exit
+discards pending approvals; an already attempted write may have an unknown outcome
+and must be reconciled without replay. Partial inventory pages, duplicate identifiers, inconsistent totals,
 wrong accounts and malformed records fail closed. Individual resource read
 failures are explicitly recorded and block complete DNS planning. Raw HTTP
 errors/bodies are not logged. ValueDomain's official stored-DNS GET supports
@@ -132,8 +134,10 @@ cargo clippy --locked --all-targets -- -D warnings
 Tests use in-memory provider fixtures and the actual CLI. They require no live
 credentials. Plan/apply must bind exact account/zone/snapshot/manifest/expiry and
 one-use approval; drift, uncertain writes and preservation of non-owned/mail DNS
-must be tested before enabling writes. Public source reflection requires review;
-real DNS/NS changes and site deployment remain separate acceptance steps (#110).
+are exercised by synthetic tests. See the owner [capability acceptance](https://github.com/zixcel/zixcel-domain/issues/23)
+and [DNS audit](https://github.com/zixcel/zixcel-domain/issues/24). Real DNS/NS
+changes, provider permissions, propagation and site deployment remain separate
+operational acceptance steps.
 
 ## Official contracts
 
@@ -268,5 +272,7 @@ Cargo.tomlのversionを更新してmain CIの成功を待ち、同じcommitへ `
 ## Common Zix entry
 
 [Native read adapter](docs/native-zix.md) reuses ValueDomain inventory and renewal
-filtering through `zix domain list`. This is source-only until native artifact
-acceptance; the existing standalone CLI and DNS execution path remain separate.
+filtering through `zix domain list`. Its immutable `native/domain/v*` releases
+have a separate manifest and binary from the standalone CLI `v*` releases.
+Choose the matching owner Release and verify its checksums; the native adapter
+does not advertise the standalone record-session commands.
