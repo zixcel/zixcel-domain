@@ -1,9 +1,10 @@
 # Scoped DNS record editing library
 
 `record_editor::Editor` handles one Cloudflare DNS record per approval. This is
-source/development acceptance for coela-release #148. It is separate from the
-existing registrar/zone migration session and is not yet a released CLI command,
-NERP UI, installed package or live-account acceptance. Version metadata is unchanged.
+a library contract separate from registrar/zone migration. The standalone
+[record-session CLI](record-cli.md) consumes it and is included in standalone
+`v*` releases. The native `zix domain` inventory adapter and NERP UI are separate
+consumers; do not infer editing support from their presence or a package download.
 
 ## Consumer flow
 
@@ -26,8 +27,9 @@ environment, creates only a read-only TXT plan, and prints no full DNS inventory
 It is compiled in development checks but is not executed against a real account.
 A transport has its own bounded lifetime; the host may create a fresh trusted
 transport for apply while retaining the same Editor and approved scope.
-The editor is library-only: it does not add a credential/session service or a
-new auto-approval CLI. Existing migration capabilities keep their current meaning.
+The library adds no credential service or automatic approval. The standalone
+record-session wrapper retains this same Editor and its one-use approval rules.
+Existing migration capabilities keep their current meaning.
 
 ## Admission and verification
 
@@ -65,8 +67,8 @@ public reachability, token-scope discovery or site deployment acceptance.
 
 ## Evidence and limits
 
-The complete source suite has 81 passing tests, zero skips (28 added here).
-Synthetic API state tests cover all 15 type/action combinations, drift/replay,
+The original editor acceptance added 28 tests; use the current owner CI for the
+current complete test count. Synthetic API state tests cover all 15 type/action combinations, drift/replay,
 expiry, cross-session and account/zone/record boundaries, input limits, metadata,
 collateral change, read-back failure, and lost response after an actual simulated
 state mutation. Separate trusted-transport tests refuse wrong providers/paths

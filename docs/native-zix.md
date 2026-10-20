@@ -16,12 +16,13 @@ in force. Unknown filters/mutations are refused before credentials/HTTP.
 
 Returned domains are credential-visible observations, not proof of all account
 rights, authoritative DNS, or permission to change anything. Native CI uses
-synthetic data and missing-credential checks, and prepares an unsigned review
-candidate with notices/checksums. Source acceptance, native tag protection,
-formal distribution and real-account validation are separate. No DNS, credential
+synthetic data and missing-credential checks, and prepares a candidate with notices/checksums. Immutable
+`native/domain/v*` tags publish accepted artifacts through the owner release
+workflow and reviewer. Source acceptance, formal distribution and real-account
+validation are separate. No DNS, credential
 or registry operation is performed by source tests.
 
-The adapter lives in `crates/domain-cli` as a separate source-only package.
+The adapter lives in `crates/domain-cli` as a separate native package.
 The registrar/DNS library keeps its existing Cargo packaging independently.
 
 Original JNI license files omitted by their crate archives are retained under
