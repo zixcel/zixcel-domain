@@ -1,0 +1,113 @@
+name: Release native provider
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['native/domain/v*']
+permissions:
+  contents: read
+concurrency:
+  group: native-release-${{ github.repository }}
+  cancel-in-progress: false
+jobs:
+  release-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: bash tools/native-release/test-admission.sh
+  prepare:
+    if: github.event_name == 'push' && github.ref_type == 'tag' && github.event.repository.private == false
+    needs: release-policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      actions: read
+    env:
+      ZIX_RELEASE_SOURCE: ${{ github.sha }}
+    outputs:
+      artifact: ${{ steps.upload.outputs.artifact-id }}
+      sha256: ${{ steps.digest.outputs.sha256 }}
+      filename: ${{ steps.digest.outputs.filename }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249
+        with:
+          toolchain: 1.97.1
+          targets: x86_64-unknown-linux-musl
+      - name: Admit exact owner version and successful main native CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tools/native-release/admit.sh
+      - name: Build and validate immutable archive
+        id: digest
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends musl-tools
+          cargo build --locked --release -p zixcel-domain-cli --bin zix-domain --target x86_64-unknown-linux-musl
+          cargo run --locked -p zixcel-domain-cli --bin package-native -- "$PWD/target/x86_64-unknown-linux-musl/release/zix-domain" "$RUNNER_TEMP/native" x86_64-unknown-linux-musl
+          cd "$RUNNER_TEMP/native"
+          sha256sum --check SHA256SUMS
+          test "$(find . -maxdepth 1 -name '*.tar.gz' | wc -l)" = 1
+          read -r digest filename < SHA256SUMS
+          [[ "$digest" =~ ^[a-f0-9]{64}$ && "$filename" =~ ^[a-z0-9.-]+-x86_64-unknown-linux-musl\.tar\.gz$ ]]
+          mkdir unpacked
+          tar -xzf "$filename" -C unpacked
+          (cd unpacked/*; sha256sum --check CONTENTS.sha256; ./zix-domain --manifest > observed.json; cmp observed.json domain.extension.json)
+          echo "sha256=$digest" >> "$GITHUB_OUTPUT"
+          echo "filename=$filename" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        id: upload
+        with:
+          name: native-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/native/*.tar.gz
+            ${{ runner.temp }}/native/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+  publish:
+    if: vars.NATIVE_PUBLISH_ENABLED == 'true'
+    needs: prepare
+    environment: native-public
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          artifact-ids: ${{ needs.prepare.outputs.artifact }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/native
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+        with:
+          subject-path: ${{ runner.temp }}/native/*.tar.gz
+      - name: Publish once and verify exact released bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DIGEST: ${{ needs.prepare.outputs.sha256 }}
+          ARCHIVE: ${{ needs.prepare.outputs.filename }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/native"
+          [[ "$DIGEST" =~ ^[a-f0-9]{64}$ && "$ARCHIVE" =~ ^[a-z0-9.-]+-x86_64-unknown-linux-musl\.tar\.gz$ ]]
+          printf '%s  %s\n' "$DIGEST" "$ARCHIVE" | sha256sum --check
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" > "$RUNNER_TEMP/release" 2> "$RUNNER_TEMP/error"; then
+            echo 'Existing release: verification only; no overwrite.'
+          else
+            grep -q '(HTTP 404)' "$RUNNER_TEMP/error"; test "$GITHUB_RUN_ATTEMPT" = 1
+            gh release create "$GITHUB_REF_NAME" "$ARCHIVE" SHA256SUMS --repo "$GITHUB_REPOSITORY" --verify-tag --target "$GITHUB_SHA" --title "$GITHUB_REF_NAME" --notes "Source $GITHUB_SHA; archive SHA256 $DIGEST."
+          fi
+          mkdir readback
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern "$ARCHIVE" --dir readback
+          test "$(sha256sum "readback/$ARCHIVE" | cut -d' ' -f1)" = "$DIGEST"
+          printf 'Verified `%s` source `%s` SHA256 `%s`.\n' "$GITHUB_REF_NAME" "$GITHUB_SHA" "$DIGEST" >> "$GITHUB_STEP_SUMMARY"
