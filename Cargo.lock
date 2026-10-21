@@ -1828,7 +1828,7 @@ dependencies = [
 [[package]]
 name = "zixcel-cloudflare-observer"
 version = "0.1.0"
-source = "git+https://github.com/zixcel/zixcel-cloudflare?rev=c51499956de7d9c75f16303a6c458a79d550688f#c51499956de7d9c75f16303a6c458a79d550688f"
+source = "git+https://github.com/zixcel/zixcel-cloudflare?rev=2d931b06c7638a520f008526bb66c71cb438d8ba#2d931b06c7638a520f008526bb66c71cb438d8ba"
 dependencies = [
  "chrono",
  "crowsi-provider-read-http",

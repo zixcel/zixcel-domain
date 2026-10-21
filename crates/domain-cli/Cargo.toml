@@ -15,7 +15,7 @@ zixcel-domain = { path = "../.." }
 zix-native-provider = { git = "https://github.com/zixcel/cli", rev = "c2ee2e9670efe81473bf7067a8efa1944589619e" }
 zix-cli = { git = "https://github.com/zixcel/cli", rev = "c2ee2e9670efe81473bf7067a8efa1944589619e" }
 serde_json = "1"
-zixcel-cloudflare-observer = { git = "https://github.com/zixcel/zixcel-cloudflare", rev = "c51499956de7d9c75f16303a6c458a79d550688f" }
+zixcel-cloudflare-observer = { git = "https://github.com/zixcel/zixcel-cloudflare", rev = "2d931b06c7638a520f008526bb66c71cb438d8ba" }
 serde = { version = "1", features = ["derive"] }
 [dev-dependencies]
 sha2 = "0.11"
