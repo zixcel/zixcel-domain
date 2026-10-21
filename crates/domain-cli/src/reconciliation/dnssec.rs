@@ -1,7 +1,7 @@
 use super::data;
 use serde_json::{Value, json};
 use zixcel_cloudflare_observer::Report;
-use zixcel_domain::{Result, error};
+use zixcel_domain::{Error, Result};
 fn ds(value: &str) -> Result<String> {
     let fields: Vec<_> = value.split_whitespace().collect();
     if fields.len() != 4
@@ -12,16 +12,16 @@ fn ds(value: &str) -> Result<String> {
         || fields[3].len() > 128
         || !fields[3].bytes().all(|b| b.is_ascii_hexdigit())
     {
-        return Err(error("invalid_ds_evidence"));
+        return Err(Error::new("invalid_ds_evidence"));
     }
     let len = match fields[2] {
         "1" => 40,
         "2" => 64,
         "4" => 96,
-        _ => return Err(error("unsupported_ds_digest")),
+        _ => return Err(Error::new("unsupported_ds_digest")),
     };
     if fields[3].len() != len {
-        return Err(error("invalid_ds_evidence"));
+        return Err(Error::new("invalid_ds_evidence"));
     }
     Ok(format!(
         "{} {} {} {}",
@@ -42,20 +42,20 @@ pub(super) fn check(report: &Report, dns: &Value, out: &mut Vec<Value>) -> Resul
     }
     let rows = parent["records"]
         .as_array()
-        .ok_or_else(|| error("invalid_parent_ds"))?;
+        .ok_or_else(|| Error::new("invalid_parent_ds"))?;
     if rows.len() > 16 {
-        return Err(error("parent_ds_budget"));
+        return Err(Error::new("parent_ds_budget"));
     }
     let records = rows
         .iter()
-        .map(|v| ds(v.as_str().ok_or_else(|| error("invalid_parent_ds"))?))
+        .map(|v| ds(v.as_str().ok_or_else(|| Error::new("invalid_parent_ds"))?))
         .collect::<Result<Vec<_>>>()?;
     let code = match config["status"].as_str() {
         Some("active") if records.is_empty() => Some("dnssec_parent_ds_missing"),
         Some("active") => {
             let expected = ds(config["ds"]
                 .as_str()
-                .ok_or_else(|| error("cloudflare_ds_unobserved"))?)?;
+                .ok_or_else(|| Error::new("cloudflare_ds_unobserved"))?)?;
             (!records.contains(&expected)).then_some("dnssec_parent_ds_mismatch")
         }
         Some("disabled") if !records.is_empty() => Some("dnssec_parent_ds_without_active_signing"),

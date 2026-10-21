@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use zixcel_cloudflare_observer::Report;
-use zixcel_domain::{Result, error};
+use zixcel_domain::{Error, Result};
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Bundle {
@@ -27,22 +27,22 @@ pub(super) fn data<'a>(report: &'a Report, key: &str) -> Option<&'a Value> {
     report.observations.get(key)?.supported()
 }
 pub fn review(bundle: &Bundle, now: u64) -> Result<Value> {
-    bundle.cloudflare.verify(now).map_err(error)?;
+    bundle.cloudflare.verify(now).map_err(Error::new)?;
     if now.saturating_sub(bundle.cloudflare.observed_at) > 3600 {
-        return Err(error("stale_cloudflare_report"));
+        return Err(Error::new("stale_cloudflare_report"));
     }
     let zone = bundle
         .cloudflare
         .scope
         .zone
         .as_ref()
-        .ok_or_else(|| error("zone_scope_required"))?;
+        .ok_or_else(|| Error::new("zone_scope_required"))?;
     if let Some(value) = data(&bundle.cloudflare, "zone")
         && (value["id"] != zone.id
             || value["name"] != zone.domain
             || value["account_id"] != bundle.cloudflare.scope.account)
     {
-        return Err(error("zone_evidence_scope_mismatch"));
+        return Err(Error::new("zone_evidence_scope_mismatch"));
     }
     zixcel_domain::dns_audit::validate_report(&bundle.dns, &zone.domain, now)?;
     let mut findings = Vec::new();
@@ -77,7 +77,7 @@ pub fn review(bundle: &Bundle, now: u64) -> Result<Value> {
         .collect();
     Ok(
         json!({"schema":"zix-domain-reconciliation/v1","domain":zone.domain,"account":bundle.cloudflare.scope.account,
-        "zone":zone.id,"source_sha256":zixcel_cloudflare_observer::digest(&serde_json::to_value(bundle).map_err(|_|error("invalid_bundle"))?),
+        "zone":zone.id,"source_sha256":zixcel_cloudflare_observer::digest(&serde_json::to_value(bundle).map_err(|_|Error::new("invalid_bundle"))?),
         "cloudflare_states":states,"findings":findings,"parent_delegation_observed":parent.is_some(),
         "registrar_observed":bundle.registrar.is_some(),"writes_performed":false,"executable":false,
         "approval_required":true,"fresh_record_plan_required_for_changes":true,"evidence_authenticity":"not_established_by_hash",
@@ -87,7 +87,7 @@ pub fn review(bundle: &Bundle, now: u64) -> Result<Value> {
 fn validate_registrar(v: &Value, domain: &str, now: u64) -> Result<()> {
     let at = v["observed_at"]
         .as_u64()
-        .ok_or_else(|| error("invalid_registrar_date"))?;
+        .ok_or_else(|| Error::new("invalid_registrar_date"))?;
     if v["schema"] != "zix-domain-registrar-observation/v1"
         || v["domain"] != domain
         || v["registration"]["domain"] != domain
@@ -95,7 +95,7 @@ fn validate_registrar(v: &Value, domain: &str, now: u64) -> Result<()> {
         || at > now.saturating_add(60)
         || now.saturating_sub(at) > 3600
     {
-        return Err(error("wrong_or_stale_registrar_report"));
+        return Err(Error::new("wrong_or_stale_registrar_report"));
     }
     Ok(())
 }

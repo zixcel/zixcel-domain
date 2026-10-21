@@ -1,7 +1,7 @@
 use super::data;
 use serde_json::{Value, json};
 use zixcel_cloudflare_observer::Report;
-use zixcel_domain::{Result, error};
+use zixcel_domain::{Error, Result};
 pub(super) fn check(
     report: &Report,
     dns: &Value,
@@ -13,15 +13,15 @@ pub(super) fn check(
         for row in rows {
             let name = row["name"]
                 .as_str()
-                .ok_or_else(|| error("dns_record_name_missing"))?;
+                .ok_or_else(|| Error::new("dns_record_name_missing"))?;
             if !(name == domain || name.ends_with(&format!(".{domain}"))) {
-                return Err(error("cross_zone_record"));
+                return Err(Error::new("cross_zone_record"));
             }
             if row["type"] == "TXT" && name == format!("_dmarc.{domain}") {
                 txt.push(
                     row["content"]
                         .as_str()
-                        .ok_or_else(|| error("invalid_txt"))?
+                        .ok_or_else(|| Error::new("invalid_txt"))?
                         .to_owned(),
                 );
             }
