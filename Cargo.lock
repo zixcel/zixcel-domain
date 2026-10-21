@@ -1826,6 +1826,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "zixcel-cloudflare-observer"
+version = "0.1.0"
+source = "git+https://github.com/zixcel/zixcel-cloudflare?rev=66b459d73c3a1fca3caf8be4416f232508580df3#66b459d73c3a1fca3caf8be4416f232508580df3"
+dependencies = [
+ "chrono",
+ "crowsi-provider-read-http",
+ "serde",
+ "serde_json",
+ "sha2",
+ "zeroize",
+]
+
+[[package]]
 name = "zixcel-domain"
 version = "0.6.0"
 dependencies = [
@@ -1836,6 +1849,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "zixcel-cloudflare-observer",
 ]
 
 [[package]]

@@ -1,14 +1,14 @@
 use super::referral::referral;
 use hickory_proto::{
-    op::Message,
-    rr::{Name, RData, RecordType},
-};
-use hickory_proto::{
     op::OpCode,
     rr::{
         Record,
         rdata::{A, NS},
     },
+};
+use hickory_proto::{
+    op::{Message, Query},
+    rr::{Name, RData, RecordType},
 };
 use std::net::Ipv4Addr;
 fn fixture() -> (Message, Message) {

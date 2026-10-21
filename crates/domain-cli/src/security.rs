@@ -16,6 +16,20 @@ pub fn execute(request: &Request) -> Result<Value, Failure> {
     if request.operation == "valuedomain.domains.list" {
         return crate::registrar::execute(request);
     }
+    if request.operation == "dns.reconcile" {
+        let path = request
+            .arguments
+            .get("report")
+            .ok_or(Error("argument_missing"))?;
+        let bytes = zix_cli::files::read(std::path::Path::new(path), 1024 * 1024, false)?;
+        let bundle =
+            serde_json::from_slice(&bytes).map_err(|_| Error("invalid_reconciliation_bundle"))?;
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| Error("clock_unavailable"))?
+            .as_secs();
+        return zixcel_domain::reconciliation::review(&bundle, now).map_err(failure);
+    }
     let domain = zixcel_domain::domain_name(
         request
             .arguments

@@ -6,11 +6,17 @@ pub fn manifest() -> Manifest {
     for (id, words, credential) in [
         ("dns.audit", vec!["dns", "audit"], false),
         ("registrar.inspect", vec!["registrar", "inspect"], true),
+        ("dns.reconcile", vec!["reconcile"], false),
     ] {
         let mut arguments = vec![Argument {
-            name: "domain".into(),
+            name: if id == "dns.reconcile" {
+                "report"
+            } else {
+                "domain"
+            }
+            .into(),
             required: true,
-            maximum: 253,
+            maximum: if id == "dns.reconcile" { 1024 } else { 253 },
         }];
         if id == "dns.audit" {
             arguments.push(Argument {
