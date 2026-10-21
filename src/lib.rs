@@ -14,7 +14,6 @@ mod empty_registered_source;
 pub mod inspection;
 pub mod mapping;
 pub mod public_dns;
-pub mod reconciliation;
 mod record_change;
 pub mod record_cli;
 mod record_data;

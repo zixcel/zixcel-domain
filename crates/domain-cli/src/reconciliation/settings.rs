@@ -1,7 +1,7 @@
 use super::data;
-use crate::{Result, error};
 use serde_json::{Value, json};
 use zixcel_cloudflare_observer::Report;
+use zixcel_domain::{Result, error};
 pub(super) fn check(
     report: &Report,
     dns: &Value,
@@ -26,7 +26,7 @@ pub(super) fn check(
                 );
             }
         }
-        match crate::dmarc::parse(&txt) {
+        match zixcel_domain::dmarc::parse(&txt) {
             Err(e) => out.push(
                 json!({"code":e.code,"source":"cloudflare_dns_records","automatic_fix":false}),
             ),

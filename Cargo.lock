@@ -1849,17 +1849,18 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "zixcel-cloudflare-observer",
 ]
 
 [[package]]
 name = "zixcel-domain-cli"
 version = "0.2.0"
 dependencies = [
+ "serde",
  "serde_json",
  "sha2",
  "zix-cli",
  "zix-native-provider",
+ "zixcel-cloudflare-observer",
  "zixcel-domain",
 ]
 

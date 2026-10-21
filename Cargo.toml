@@ -20,7 +20,6 @@ idna = "1"
 sha2 = "0.11.0"
 hickory-proto = { version = "0.26.3", default-features = false, features = ["std"] }
 chrono = { version = "0.4", default-features = false, features = ["std"] }
-zixcel-cloudflare-observer = { git = "https://github.com/zixcel/zixcel-cloudflare", rev = "c51499956de7d9c75f16303a6c458a79d550688f" }
 
 [lints.rust]
 unsafe_code = "forbid"

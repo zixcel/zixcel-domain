@@ -1,7 +1,7 @@
 use super::data;
-use crate::{Result, error};
 use serde_json::{Value, json};
 use zixcel_cloudflare_observer::Report;
+use zixcel_domain::{Result, error};
 fn ds(value: &str) -> Result<String> {
     let fields: Vec<_> = value.split_whitespace().collect();
     if fields.len() != 4

@@ -1,11 +1,11 @@
 //! Cross-source review only. Provider grants and fresh record execution remain separate.
 mod dnssec;
 mod settings;
-use crate::{Result, error};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use zixcel_cloudflare_observer::Report;
+use zixcel_domain::{Result, error};
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Bundle {
@@ -19,7 +19,7 @@ pub(super) fn names(value: &Value) -> Option<BTreeSet<String>> {
         .filter(|r| !r.is_empty() && r.len() <= 16)?;
     let names: Option<BTreeSet<_>> = rows
         .iter()
-        .map(|v| crate::domain_name(v.as_str()?).ok())
+        .map(|v| zixcel_domain::domain_name(v.as_str()?).ok())
         .collect();
     names.filter(|set| set.len() == rows.len())
 }
@@ -44,7 +44,7 @@ pub fn review(bundle: &Bundle, now: u64) -> Result<Value> {
     {
         return Err(error("zone_evidence_scope_mismatch"));
     }
-    crate::dns_audit::validate_report(&bundle.dns, &zone.domain, now)?;
+    zixcel_domain::dns_audit::validate_report(&bundle.dns, &zone.domain, now)?;
     let mut findings = Vec::new();
     let authority = &bundle.dns["observations"]["authority"];
     let parent = if authority["state"] == "supported" {

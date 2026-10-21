@@ -57,7 +57,8 @@ also binds account and zone. Reports older than one hour or outside the accepted
 clock tolerance are rejected. The file must be absolute, owned by the caller,
 not group/world writable and not a symlink. No credentials are needed.
 
-`dns-security-review` accepts the same bundle on stdin. Reconciliation compares
+Cross-provider reconciliation belongs to the native zix adapter, keeping the
+Domain core independent of Cloudflare transport and serialization. It compares
 registrar/parent/Cloudflare nameservers, parent DS and Cloudflare DNSSEC state,
 and configured/public DMARC policy. The five Cloudflare findings retain unknown
 and applicability states. A widget alone proves neither browser integration

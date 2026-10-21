@@ -28,7 +28,7 @@ pub fn execute(request: &Request) -> Result<Value, Failure> {
             .duration_since(UNIX_EPOCH)
             .map_err(|_| Error("clock_unavailable"))?
             .as_secs();
-        return zixcel_domain::reconciliation::review(&bundle, now).map_err(failure);
+        return crate::reconciliation::review(&bundle, now).map_err(failure);
     }
     let domain = zixcel_domain::domain_name(
         request
