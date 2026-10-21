@@ -11,6 +11,7 @@ use std::{
 };
 pub fn decode(response: &Message, query: &Message, kind: RecordType) -> Result<Vec<String>> {
     if query.queries.len() != 1
+        || query.queries[0].query_type != kind
         || response.metadata.id != query.metadata.id
         || response.queries != query.queries
         || response.metadata.message_type != MessageType::Response

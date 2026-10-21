@@ -23,6 +23,7 @@ fn exact_authoritative_rrset_is_required() {
         RData::NS(NS(Name::from_ascii("ns1.example.net.").unwrap())),
     ));
     assert_eq!(decode(&r, &q, RecordType::NS).unwrap().len(), 1);
+    assert!(decode(&r, &q, RecordType::DS).is_err());
     let mut bad = r.clone();
     bad.metadata.authoritative = false;
     assert!(decode(&bad, &q, RecordType::NS).is_err());

@@ -4,6 +4,7 @@
 zix domain dns audit --domain example.org
 zix domain dns audit --domain example.org --authority true
 zix domain registrar inspect --domain example.org
+zix domain reconcile --report /absolute/path/to/evidence.json
 ```
 
 Public DNS commands subtract credential/runtime environment variables. Registrar
@@ -46,3 +47,19 @@ mailbox or unfinished URL is published here.
 
 Standards: https://www.rfc-editor.org/rfc/rfc7489.html and
 https://www.rfc-editor.org/rfc/rfc9116.html .
+
+## Cross-source reconciliation
+
+The report file is a bounded JSON bundle with `cloudflare`, `dns` and optional
+`registrar` observations. Use the corresponding CLI outputs, removing any outer
+standalone CLI envelope. Each source must identify the same domain; Cloudflare
+also binds account and zone. Reports older than one hour or outside the accepted
+clock tolerance are rejected. The file must be absolute, owned by the caller,
+not group/world writable and not a symlink. No credentials are needed.
+
+`dns-security-review` accepts the same bundle on stdin. Reconciliation compares
+registrar/parent/Cloudflare nameservers, parent DS and Cloudflare DNSSEC state,
+and configured/public DMARC policy. The five Cloudflare findings retain unknown
+and applicability states. A widget alone proves neither browser integration
+nor server-side verification. Configuration hashes detect changes; they do not
+authenticate evidence. Results never authorize or execute changes.
