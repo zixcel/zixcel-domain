@@ -1,12 +1,15 @@
 # zixcel-domain — local registrar and DNS administration
 
+[DNS/DMARC/security.txt evidence](docs/dns-security-audit.md) documents bounded
+observations, explicit unknown states and approved repair boundaries.
+
 One Rust crate owns the library,
 provider adapters and JSON CLI; NERP and Codex can consume the same implementation.
 It provides account inventory, offline previews and scoped local DNS migration
 sessions with one-use plan approvals. The [record editing library](docs/record-editor.md)
 and [record-session CLI](docs/record-cli.md) provide separately reviewed
 A/AAAA/CNAME/TXT/MX changes. The standalone CLI release includes that session.
-The independently versioned native `zix domain` adapter provides inventory only;
+The independently versioned native `zix domain` adapter provides inventory and bounded DNS diagnostics;
 its release does not enable DNS writes or a NERP UI.
 
 The library implements bounded ValueDomain v2 inventory,

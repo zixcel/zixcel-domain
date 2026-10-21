@@ -46,6 +46,7 @@ impl Editor {
         let edit = edit.normalize(&self.scope)?;
         let before = record_snapshot::read(transport, &self.scope)?;
         edit.validate(&before)?;
+        crate::dmarc::edit::validate(&self.scope, &before, &edit)?;
         let created_at = approval::now()?;
         let plan = RecordPlan {
             implementation_version: env!("CARGO_PKG_VERSION").into(),

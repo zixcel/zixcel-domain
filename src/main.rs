@@ -7,6 +7,9 @@ use zixcel_domain::{
 };
 
 fn run(args: &[String]) -> Result<serde_json::Value> {
+    if let Some(result) = zixcel_domain::security_cli::run(args) {
+        return result.map(|value| serde_json::json!({"schema_version":1,"result":value}));
+    }
     let failure = || zixcel_domain::Error::new("invalid_command");
     let value = match args {
         [command] if command == "version" || command == "--version" => serde_json::json!({

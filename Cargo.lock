@@ -123,6 +123,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "chrono"
+version = "0.4.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1aa79e62e7697b8e29b513a68abacf485adcd1fe8284a4316c5ae868e6633327"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "combine"
 version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -172,7 +181,7 @@ dependencies = [
 [[package]]
 name = "crowsi-provider-read-http"
 version = "0.1.0"
-source = "git+https://github.com/crowsi-net/crowsi-transport-foundation?rev=f5edce4df5b58e90224ad05390d79fe2f571b4a5#f5edce4df5b58e90224ad05390d79fe2f571b4a5"
+source = "git+https://github.com/crowsi-net/crowsi-transport-foundation?rev=8daf36688e1618f294274c61ebfe607f77639534#8daf36688e1618f294274c61ebfe607f77639534"
 dependencies = [
  "crowsi-transport-foundation",
  "reqwest",
@@ -182,7 +191,7 @@ dependencies = [
 [[package]]
 name = "crowsi-transport-foundation"
 version = "0.10.0"
-source = "git+https://github.com/crowsi-net/crowsi-transport-foundation?rev=f5edce4df5b58e90224ad05390d79fe2f571b4a5#f5edce4df5b58e90224ad05390d79fe2f571b4a5"
+source = "git+https://github.com/crowsi-net/crowsi-transport-foundation?rev=8daf36688e1618f294274c61ebfe607f77639534#8daf36688e1618f294274c61ebfe607f77639534"
 dependencies = [
  "bytes",
  "http",
@@ -356,9 +365,9 @@ dependencies = [
 
 [[package]]
 name = "granit-parser"
-version = "1.3.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e20f99e46474f56bd905c56e817ebddcf377a611f94c53ac4649e4d3fa3c0cd0"
+checksum = "da55feca5d1625466bae068f9fd4b87892caeae70c3fe671ddb0f50d41aebf37"
 dependencies = [
  "arraydeque",
  "smallvec",
@@ -1072,9 +1081,9 @@ dependencies = [
 
 [[package]]
 name = "serde-saphyr"
-version = "1.3.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8050abb251097357e24aff63ba2c52a6309ecb7d23a5474023df960a02694d8"
+checksum = "a253edfdea34032da21af84e16fcc94f4c7a6ba237f9f3bc2dbf43cea8535c44"
 dependencies = [
  "annotate-snippets",
  "encoding_rs_io",
@@ -1768,8 +1777,8 @@ dependencies = [
 
 [[package]]
 name = "zix-cli"
-version = "0.2.0"
-source = "git+https://github.com/zixcel/cli?rev=d8fc1af5031ab999b24ce6eb07d7d45c7f7f62c8#d8fc1af5031ab999b24ce6eb07d7d45c7f7f62c8"
+version = "0.2.4"
+source = "git+https://github.com/zixcel/cli?rev=c2ee2e9670efe81473bf7067a8efa1944589619e#c2ee2e9670efe81473bf7067a8efa1944589619e"
 dependencies = [
  "crowsi-process-adapter",
  "rustix",
@@ -1779,13 +1788,14 @@ dependencies = [
  "sha2",
  "tokio",
  "url",
+ "zix-operation-contracts",
  "zixcel-bounded-io",
 ]
 
 [[package]]
 name = "zix-native-provider"
 version = "0.1.0"
-source = "git+https://github.com/zixcel/cli?rev=d8fc1af5031ab999b24ce6eb07d7d45c7f7f62c8#d8fc1af5031ab999b24ce6eb07d7d45c7f7f62c8"
+source = "git+https://github.com/zixcel/cli?rev=c2ee2e9670efe81473bf7067a8efa1944589619e#c2ee2e9670efe81473bf7067a8efa1944589619e"
 dependencies = [
  "crowsi-provider-read-http",
  "serde",
@@ -1793,6 +1803,16 @@ dependencies = [
  "url",
  "zeroize",
  "zix-cli",
+]
+
+[[package]]
+name = "zix-operation-contracts"
+version = "0.1.0"
+source = "git+https://github.com/zixcel/cli?rev=c2ee2e9670efe81473bf7067a8efa1944589619e#c2ee2e9670efe81473bf7067a8efa1944589619e"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]
@@ -1807,8 +1827,9 @@ dependencies = [
 
 [[package]]
 name = "zixcel-domain"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
+ "chrono",
  "hickory-proto",
  "idna",
  "reqwest",
@@ -1819,10 +1840,11 @@ dependencies = [
 
 [[package]]
 name = "zixcel-domain-cli"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "serde_json",
  "sha2",
+ "zix-cli",
  "zix-native-provider",
  "zixcel-domain",
 ]
