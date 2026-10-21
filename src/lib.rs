@@ -1,8 +1,12 @@
 //! Local registrar/DNS inventory. Credentials never enter the inventory model.
 mod approval;
+pub mod authority;
 pub mod cloudflare;
 pub mod delegation;
+pub mod dmarc;
+pub mod dns_audit;
 pub mod dns_import;
+pub mod dns_name;
 pub mod domain_release;
 #[cfg(unix)]
 pub mod domain_session;
@@ -17,6 +21,8 @@ pub mod record_editor;
 mod record_execution;
 mod record_http;
 mod record_snapshot;
+pub mod security_cli;
+pub mod security_txt;
 pub mod transport;
 pub mod valuedomain;
 

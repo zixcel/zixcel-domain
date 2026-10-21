@@ -7,6 +7,9 @@ use zixcel_domain::{
 };
 
 fn run(args: &[String]) -> Result<serde_json::Value> {
+    if let Some(result) = zixcel_domain::security_cli::run(args) {
+        return result.map(|value| serde_json::json!({"schema_version":1,"result":value}));
+    }
     let failure = || zixcel_domain::Error::new("invalid_command");
     let value = match args {
         [command] if command == "version" || command == "--version" => serde_json::json!({
@@ -15,7 +18,7 @@ fn run(args: &[String]) -> Result<serde_json::Value> {
         }),
         [command] if command == "capabilities" => serde_json::json!({
             "schema_version": 1, "registrar": "valuedomain-v2", "dns": "cloudflare",
-            "operations": ["inventory", "inspect", "mapping-preview", "dns-source-preview", "dns-import-preview", "public-dns", "public-nameservers", "public-delegation", "valuedomain-domains", "valuedomain-settings", "valuedomain-free-dns", "valuedomain-nameservers", "domain-session", "domain-control", "record-session", "cloudflare-zones", "cloudflare-records", "validate-bindings"],
+            "operations": ["dns-security-audit", "securitytxt-preview", "inventory", "inspect", "mapping-preview", "dns-source-preview", "dns-import-preview", "public-dns", "public-nameservers", "public-delegation", "valuedomain-domains", "valuedomain-settings", "valuedomain-free-dns", "valuedomain-nameservers", "domain-session", "domain-control", "record-session", "cloudflare-zones", "cloudflare-records", "validate-bindings"],
             "writes_supported": true, "live_acceptance": false,
             "write_operations": ["prepare_zone", "change_nameservers", "record_create", "record_update", "record_delete"],
             "record_session": {"command":"record-session", "protocol":1, "record_types":["A","AAAA","CNAME","TXT","MX"], "actions":["plan","apply","status","stop"], "request_bytes":8192, "response_bytes":1048576, "request_limit":100},

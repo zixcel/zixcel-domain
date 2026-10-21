@@ -1,5 +1,5 @@
 //! Bounded recursive observations, never a complete zone export.
-use crate::{Result, domain_name, error, transport::ReadTransport};
+use crate::{Result, dns_name::record_name, error, transport::ReadTransport};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -19,7 +19,7 @@ pub struct Answer {
 }
 
 pub fn query(transport: &mut impl ReadTransport, domain: &str, record_type: &str) -> Result<Query> {
-    let domain = domain_name(domain)?;
+    let domain = record_name(domain)?;
     let record_type = record_type.to_ascii_uppercase();
     let number = match record_type.as_str() {
         "A" => 1,
@@ -29,6 +29,7 @@ pub fn query(transport: &mut impl ReadTransport, domain: &str, record_type: &str
         "TXT" => 16,
         "AAAA" => 28,
         "DS" => 43,
+        "DNSKEY" => 48,
         "CAA" => 257,
         _ => return Err(error("unsupported_dns_query")),
     };
@@ -48,7 +49,7 @@ pub fn query(transport: &mut impl ReadTransport, domain: &str, record_type: &str
         .ok_or_else(|| error("invalid_dns_response"))?;
     if questions.len() != 1
         || questions[0]["type"].as_u64() != Some(number)
-        || domain_name(
+        || record_name(
             questions[0]["name"]
                 .as_str()
                 .ok_or_else(|| error("invalid_dns_response"))?,
@@ -65,7 +66,7 @@ pub fn query(transport: &mut impl ReadTransport, domain: &str, record_type: &str
             return Err(error("record_budget"));
         }
         for record in records {
-            let name = domain_name(
+            let name = record_name(
                 record["name"]
                     .as_str()
                     .ok_or_else(|| error("invalid_dns_response"))?,

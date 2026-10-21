@@ -40,6 +40,9 @@ pub trait ReadTransport {
     fn delegation(&mut self, _domain: &str) -> Result<Vec<String>> {
         Err(error("delegation_unavailable"))
     }
+    fn authority(&mut self, _domain: &str) -> Result<Value> {
+        Err(error("authority_unavailable"))
+    }
 }
 
 pub trait WriteTransport: ReadTransport {
@@ -62,6 +65,18 @@ pub struct HttpTransport {
     bytes_left: usize,
 }
 impl ReadTransport for HttpTransport {
+    fn authority(&mut self, domain: &str) -> Result<Value> {
+        if !matches!(self.provider, Provider::PublicDns) || self.authorization.is_some() {
+            return Err(error("authority_requires_no_credential"));
+        }
+        if self.requests_left < 28
+            || self.deadline.saturating_duration_since(Instant::now()) < Duration::from_secs(24)
+        {
+            return Err(error("authority_budget"));
+        }
+        self.requests_left -= 28;
+        crate::authority::observe(domain)
+    }
     fn delegation(&mut self, domain: &str) -> Result<Vec<String>> {
         if !matches!(self.provider, Provider::PublicDns) || self.authorization.is_some() {
             return Err(error("delegation_requires_no_credential"));
