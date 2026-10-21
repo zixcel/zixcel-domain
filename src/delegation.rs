@@ -2,6 +2,7 @@
 mod referral;
 mod walk;
 use crate::Result;
+use std::net::Ipv4Addr;
 pub use walk::details;
 pub fn query(input: &str) -> Result<Vec<String>> {
     Ok(details(input)?.nameservers)
