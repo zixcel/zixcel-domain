@@ -1,4 +1,3 @@
-
 use super::referral::referral;
 use hickory_proto::{
     op::Message,
