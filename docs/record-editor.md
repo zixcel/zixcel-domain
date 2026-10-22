@@ -84,3 +84,5 @@ Official references checked on 2026-10-16:
 [PATCH](https://developers.cloudflare.com/api/resources/dns/subresources/records/methods/edit/),
 [delete](https://developers.cloudflare.com/api/resources/dns/subresources/records/methods/delete/),
 [zone details](https://developers.cloudflare.com/api/resources/zones/methods/get/).
+
+CNAME targets accept ASCII service labels such as `selector1._domainkey.mail.example.test`. The same DNS-name rules apply to CNAME imports and public DNS queries. MX targets, registrar domains and HTTP host validation retain hostname rules. Wildcards, URL syntax, empty labels and oversized labels are refused before provider access.

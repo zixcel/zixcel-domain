@@ -51,7 +51,8 @@ impl RecordData {
                 .parse::<Ipv6Addr>()
                 .map_err(|_| error("invalid_address"))?
                 .to_string(),
-            RecordType::CNAME | RecordType::MX => domain_name(&self.content)?,
+            RecordType::CNAME => crate::dns_name::record_name(&self.content)?,
+            RecordType::MX => domain_name(&self.content)?,
             RecordType::TXT => self.content,
         };
         if self.kind == RecordType::CNAME && self.content == self.name {
