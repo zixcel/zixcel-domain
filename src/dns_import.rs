@@ -102,7 +102,11 @@ pub fn parse(zone: &str, ttl: u32, text: &str) -> Result<Vec<Record>> {
                     }
                     _ => {
                         record.record_type = "CNAME";
-                        target(&zone, words[2])?
+                        crate::dns_name::record_name(if words[2] == "@" {
+                            &zone
+                        } else {
+                            words[2]
+                        })?
                     }
                 });
             }
