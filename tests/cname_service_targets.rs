@@ -32,6 +32,10 @@ fn dkim_cname_target_survives_plan_apply_and_import() {
 
 #[test]
 fn accepting_dns_service_names_does_not_relax_host_or_mx_validation() {
+    assert_eq!(
+        dns_name::record_name("_DMARC.BÜCHER.EXAMPLE.").unwrap(),
+        "_dmarc.xn--bcher-kva.example"
+    );
     let target = "selector1._domainkey.mail.example.test";
     assert!(domain_name(target).is_err());
     let mut mx = data(RecordType::MX);
