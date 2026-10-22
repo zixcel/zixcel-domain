@@ -12,6 +12,13 @@ pub fn record_name(value: &str) -> Result<String> {
     }
     let name = value.trim_end_matches('.').to_ascii_lowercase();
     let labels: Vec<_> = name.split('.').collect();
+    let host_start = labels
+        .iter()
+        .rposition(|label| label.starts_with('_'))
+        .ok_or_else(|| error("invalid_dns_owner"))?
+        + 1;
+    // Preserve the original requirement for a fully qualified host suffix.
+    domain_name(&labels[host_start..].join("."))?;
     let mut host_labels = Vec::new();
     for label in &labels {
         if let Some(service) = label.strip_prefix('_') {
