@@ -142,16 +142,27 @@ cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
 cargo build --locked --release -p zixcel-domain-cli --bin zix-domain --target x86_64-unknown-linux-musl
 ```
 
-Owner releases use `native/domain/v0.3.0` after the same source passes main native
+Owner releases use `native/domain/v0.3.1` after the same source passes main native
 CI. The existing packaging workflow binds manifest, binary hashes and notices.
 Use the official immutable archive, verify SHA256SUMS and CONTENTS.sha256, compare
 `zix-domain --manifest` with `domain.extension.json`, and explicitly replace the
-old registration via `zix extensions remove domain` / `extensions add` with both
-verified hashes. Do not overwrite old release assets. Candidate testing uses an
+old registration using `extensions inspect` / `extensions replace` with the
+observed previous hashes and verified new hashes (zix >=0.2.5). Do not remove the
+old registration first. Disabled state is preserved. Do not overwrite old release assets. Candidate testing uses an
 isolated `XDG_CONFIG_HOME`; a missing official asset is not a source-install fallback.
 
 For an explicitly selected official version, `bash playground/install-native-local.sh
-0.3.0` downloads the archive, checks its archive/content hashes and manifest, keeps
+0.3.1` downloads the archive, checks its archive/content hashes and manifest, keeps
 a private previous-registration snapshot and replaces only the Domain registration.
-A failed download or check stops before registry changes. Checksums alone do not
+A failed download or check stops before registry changes. The helper requires
+zix >=0.2.5, including for fresh installations, and supports both v1 and v2 Domain
+release manifests for explicit rollback. Failed replacement preflight leaves the
+old registration untouched; no snapshot overwrite or separate remove/add is used. Checksums alone do not
 establish cryptographic provenance; also inspect the owner CI/release record.
+
+The installer acceptance script `tests/installer-lifecycle.py` takes an official
+released zix executable (with RELEASE.json) and two verified cached Domain releases.
+It checks fresh registration, disabled upgrades, explicit downgrade/re-upgrade and
+corrupt archive refusal in an isolated registry without provider credentials. Native
+CI runs it with CLI 0.2.5 and Domain 0.2.0/0.3.0 release archives. Production
+acceptance should additionally select the newly published Domain release.

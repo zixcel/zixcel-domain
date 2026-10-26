@@ -4,7 +4,9 @@ Use **`zix domain …`** through the Zixcel CLI as the standard operator entry.
 See [the unified command guide](docs/native-zix.md) for inventory, private profiles,
 DNS export, record plan/apply and nameserver migration. Native 0.3.0 adds these
 operations using manifest v2 and durable journals; zix 0.2.4 or newer is required.
-Source/candidate acceptance and official release availability are distinct.
+Native 0.3.1 updates the installation helper to require zix >=0.2.5 for atomic
+replacement and disabled-registration handling. Source/candidate acceptance and
+official release availability are distinct.
 
 The standalone commands and socket examples below are compatibility interfaces
 for existing callers, not the preferred entry for new workflows.
