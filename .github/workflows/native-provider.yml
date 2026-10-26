@@ -21,6 +21,21 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo test --locked --workspace --all-targets --all-features
       - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - name: Verify installer lifecycle with official released tools
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$RUNNER_TEMP/lifecycle/cli" "$RUNNER_TEMP/lifecycle/old" "$RUNNER_TEMP/lifecycle/new"
+          gh release download v0.2.5 --repo zixcel/cli --pattern '*.tar.gz' --pattern SHA256SUMS --dir "$RUNNER_TEMP/lifecycle/cli"
+          gh release download native/domain/v0.2.0 --repo zixcel/zixcel-domain --pattern '*.tar.gz' --pattern SHA256SUMS --dir "$RUNNER_TEMP/lifecycle/old"
+          gh release download native/domain/v0.3.0 --repo zixcel/zixcel-domain --pattern '*.tar.gz' --pattern SHA256SUMS --dir "$RUNNER_TEMP/lifecycle/new"
+          for directory in cli old new; do
+            (cd "$RUNNER_TEMP/lifecycle/$directory"; sha256sum --check SHA256SUMS)
+          done
+          tar --no-same-owner -xzf "$RUNNER_TEMP/lifecycle/cli/zix-cli-v0.2.5-x86_64-unknown-linux-musl.tar.gz" -C "$RUNNER_TEMP/lifecycle/cli"
+          (cd "$RUNNER_TEMP/lifecycle/cli/zix-cli-v0.2.5-x86_64-unknown-linux-musl"; sha256sum --check CONTENTS.sha256)
+          python3 tests/installer-lifecycle.py "$RUNNER_TEMP/lifecycle/cli/zix-cli-v0.2.5-x86_64-unknown-linux-musl/zix" 0.2.0 "$RUNNER_TEMP/lifecycle/old" 0.3.0 "$RUNNER_TEMP/lifecycle/new"
       - name: Prepare static native candidate without publication
         env:
           ZIX_RELEASE_SOURCE: ${{ github.sha }}

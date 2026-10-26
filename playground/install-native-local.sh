@@ -10,8 +10,8 @@ python3 - <<'PY_VERSION'
 import re,subprocess
 value=subprocess.check_output(['zix','version'],text=True).strip()
 m=re.fullmatch(r'zix (\d+)\.(\d+)\.(\d+)',value)
-if not m or tuple(map(int,m.groups())) < (0,2,4):
-    raise SystemExit('zix >=0.2.4 is required before replacing the Domain extension')
+if not m or tuple(map(int,m.groups())) < (0,2,5):
+    raise SystemExit('zix >=0.2.5 is required before replacing the Domain extension')
 PY_VERSION
 base_dir="${XDG_DATA_HOME:-$HOME/.local/share}/zix/packages"
 install -d -m 700 "$base_dir"
@@ -51,28 +51,29 @@ executable="$(dirname "$manifest")/zix-domain"
   python3 - "$version" <<'PY_MANIFEST'
 import json,sys
 m=json.load(open('domain.extension.json'))
-if (m['namespace'],m['version'],m['schema'],m['platform']) != ('domain',sys.argv[1],'zix-extension/v2','linux-x86_64'):
+if (m['namespace'],m['version'],m['platform']) != ('domain',sys.argv[1],'linux-x86_64') or m['schema'] not in ('zix-extension/v1','zix-extension/v2'):
     raise SystemExit('unexpected Domain release identity')
 PY_MANIFEST
 )
-# Save enough registration evidence to restore the previous verified package if needed.
-zix describe domain --format json > "$package_dir/previous-manifest.json" 2> "$package_dir/previous-error.json" && installed=true || installed=false
-registry="${XDG_CONFIG_HOME:-$HOME/.config}/zix/extensions.json"
-if [[ -f "$registry" ]]; then cp -- "$registry" "$package_dir/previous-extensions.json"; fi
-if "$installed"; then zix extensions remove domain; fi
-if ! zix extensions add --manifest "$manifest" --manifest-sha256 "$(sha256sum "$manifest" | cut -d' ' -f1)" --executable "$executable" --executable-sha256 "$(sha256sum "$executable" | cut -d' ' -f1)"; then
-  if "$installed"; then
-    python3 - "$package_dir/previous-extensions.json" "$package_dir" <<'PY_RESTORE'
-import json,pathlib,subprocess,sys
-previous=json.load(open(sys.argv[1]))
-entry=next(e for e in previous['entries'] if json.loads(e['manifest_text'])['namespace']=='domain')
-manifest=pathlib.Path(sys.argv[2])/'restore-manifest.json'
-manifest.write_text(entry['manifest_text'])
-subprocess.run(['zix','extensions','add','--manifest',str(manifest),'--manifest-sha256',entry['manifest_sha256'],'--executable',entry['executable'],'--executable-sha256',entry['executable_sha256']],check=True)
-if not entry['enabled']:
-    subprocess.run(['zix','extensions','disable','domain'],check=True)
-PY_RESTORE
-  fi
+# Metadata lookup includes disabled registrations. Any read/parse error stops here.
+zix extensions list --format json > "$package_dir/previous-registrations.json"
+python3 - "$package_dir/previous-registrations.json" > "$package_dir/previous-hashes.txt" <<'PY_STATE'
+import json,sys
+inventory=json.load(open(sys.argv[1]))
+for entry in inventory['entries']:
+    if entry['namespace']=='domain':
+        print(entry['manifest_sha256'])
+        print(entry['executable_sha256'])
+PY_STATE
+mapfile -t previous < "$package_dir/previous-hashes.txt"
+args=(--manifest "$manifest" --manifest-sha256 "$(sha256sum "$manifest" | cut -d' ' -f1)"
+      --executable "$executable" --executable-sha256 "$(sha256sum "$executable" | cut -d' ' -f1)")
+if [[ ${#previous[@]} == 2 ]]; then
+  zix extensions replace "${args[@]}" --expected-manifest-sha256 "${previous[0]}" --expected-executable-sha256 "${previous[1]}"
+elif [[ ${#previous[@]} == 0 ]]; then
+  zix extensions add "${args[@]}"
+else
+  echo 'Invalid registration metadata; no changes performed.' >&2
   exit 2
 fi
-zix describe domain --format json
+zix extensions inspect domain --format json
