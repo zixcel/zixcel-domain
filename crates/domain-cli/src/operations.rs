@@ -52,7 +52,7 @@ pub fn read<T: DeserializeOwned>(path: &str) -> Result<T, Error> {
 pub fn binding() -> Result<Binding, Error> {
     let bytes = zix_cli::files::bounded(
         std::fs::File::open("/proc/self/exe").map_err(|_| Error("executable_unavailable"))?,
-        32 * 1024 * 1024,
+        128 * 1024 * 1024,
     )?;
     Ok(Binding::for_catalog(
         env!("CARGO_PKG_NAME"),
