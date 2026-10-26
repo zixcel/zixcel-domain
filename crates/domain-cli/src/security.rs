@@ -37,6 +37,8 @@ pub fn execute(request: &Request) -> Result<Value, Failure> {
             | "dns.export"
             | "dns.records.plan"
             | "dns.records.apply"
+            | "dns.records.resolve.plan"
+            | "dns.records.resolve.apply"
             | "nameservers.inspect"
             | "nameservers.plan"
             | "nameservers.apply"

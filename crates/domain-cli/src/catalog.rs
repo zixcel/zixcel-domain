@@ -79,6 +79,25 @@ pub fn manifest() -> Manifest {
             "read",
         ),
         (
+            "dns.records.resolve.plan",
+            vec!["dns", "records", "resolve", "plan"],
+            vec!["profile", "original-plan-file"],
+            true,
+            "read",
+        ),
+        (
+            "dns.records.resolve.apply",
+            vec!["dns", "records", "resolve", "apply"],
+            vec![
+                "profile",
+                "plan-file",
+                "approval-sha256",
+                "journal-directory",
+            ],
+            true,
+            "operator-write",
+        ),
+        (
             "dns.records.apply",
             vec!["dns", "records", "apply"],
             vec![
