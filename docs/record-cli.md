@@ -1,8 +1,9 @@
 # Scoped DNS record CLI
 
 The standalone `zixcel-domain` CLI provides scoped DNS record sessions in its
-`v*` releases. The native `zix domain` adapter is independently versioned and
-advertises inventory only. Development acceptance uses synthetic providers; it
+`v*` releases. The native `zix domain` adapter is independently versioned; native 0.3.0 exposes
+record plan/apply through the common Zixcel CLI and is the preferred operator entry
+([guide](native-zix.md)). This page documents the retained standalone compatibility interface. Development acceptance uses synthetic providers; it
 does not verify live token permissions, public DNS propagation or a NERP UI.
 
 Build with the existing Rust toolchain: `cargo build --locked`.

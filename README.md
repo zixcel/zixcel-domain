@@ -282,8 +282,8 @@ Cargo.tomlのversionを更新してmain CIの成功を待ち、同じcommitへ `
 
 ## Common Zix entry
 
-[Native read adapter](docs/native-zix.md) reuses ValueDomain inventory and renewal
-filtering through `zix domain list`. Its immutable `native/domain/v*` releases
+[Native adapter](docs/native-zix.md) reuses inventory, DNS record and migration
+libraries through the common `zix domain` entry. Its immutable `native/domain/v*` releases
 have a separate manifest and binary from the standalone CLI `v*` releases.
 Choose the matching owner Release and verify its checksums; the native adapter
-does not advertise the standalone record-session commands.
+uses detached record plan/apply instead of the standalone record-session protocol.
