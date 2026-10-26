@@ -24,6 +24,7 @@ pub fn query(transport: &mut impl ReadTransport, domain: &str, record_type: &str
     let number = match record_type.as_str() {
         "A" => 1,
         "NS" => 2,
+        "CNAME" => 5,
         "SOA" => 6,
         "MX" => 15,
         "TXT" => 16,

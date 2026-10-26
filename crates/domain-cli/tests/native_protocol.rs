@@ -3,8 +3,17 @@ use zix_native_provider::Request;
 use zixcel_domain::{Result, transport::ReadTransport};
 use zixcel_domain_cli as native;
 fn request() -> Request {
+    request_for(&std::env::current_exe().unwrap())
+}
+fn request_for(path: &std::path::Path) -> Request {
+    let binding = zix_operation_contracts::Binding::for_catalog(
+        "zixcel-domain-cli",
+        env!("CARGO_PKG_VERSION"),
+        &serde_json::to_value(native::manifest()).unwrap(),
+        &zix_cli::files::digest(&std::fs::read(path).unwrap()),
+    );
     serde_json::from_value(json!({"schema":"zix-provider/v1","id":"0".repeat(32),"operation":"valuedomain.domains.list",
-    "arguments":{},"limits":{"timeout_ms":5000,"maximum_response_bytes":65536}})).unwrap()
+    "arguments":{},"binding":binding,"limits":{"timeout_ms":5000,"maximum_response_bytes":65536}})).unwrap()
 }
 struct Fake {
     paths: Vec<String>,
@@ -77,7 +86,12 @@ fn native_binary_has_no_ambient_credential_fallback_or_node_requirement() {
         .stdin
         .take()
         .unwrap()
-        .write_all(&serde_json::to_vec(&request()).unwrap())
+        .write_all(
+            &serde_json::to_vec(&request_for(std::path::Path::new(env!(
+                "CARGO_BIN_EXE_zix-domain"
+            ))))
+            .unwrap(),
+        )
         .unwrap();
     let output = child.wait_with_output().unwrap();
     assert!(output.status.success());

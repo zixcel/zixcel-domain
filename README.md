@@ -1,4 +1,13 @@
-# zixcel-domain — local registrar and DNS administration
+# zix domain — local registrar and DNS administration
+
+Use **`zix domain …`** through the Zixcel CLI as the standard operator entry.
+See [the unified command guide](docs/native-zix.md) for inventory, private profiles,
+DNS export, record plan/apply and nameserver migration. Native 0.3.0 adds these
+operations using manifest v2 and durable journals; zix 0.2.4 or newer is required.
+Source/candidate acceptance and official release availability are distinct.
+
+The standalone commands and socket examples below are compatibility interfaces
+for existing callers, not the preferred entry for new workflows.
 
 [DNS/DMARC/security.txt evidence](docs/dns-security-audit.md) documents bounded
 observations, explicit unknown states and approved repair boundaries.
@@ -9,8 +18,7 @@ It provides account inventory, offline previews and scoped local DNS migration
 sessions with one-use plan approvals. The [record editing library](docs/record-editor.md)
 and [record-session CLI](docs/record-cli.md) provide separately reviewed
 A/AAAA/CNAME/TXT/MX changes. The standalone CLI release includes that session.
-The independently versioned native `zix domain` adapter provides inventory and bounded DNS diagnostics;
-its release does not enable DNS writes or a NERP UI.
+The independently versioned native `zix domain` adapter provides inventory, bounded DNS diagnostics and explicitly approved DNS writes. It does not provide a NERP UI.
 
 The library implements bounded ValueDomain v2 inventory,
 registrar NS/stored DNS inspection, Cloudflare account-scoped zone and record
@@ -274,8 +282,8 @@ Cargo.tomlのversionを更新してmain CIの成功を待ち、同じcommitへ `
 
 ## Common Zix entry
 
-[Native read adapter](docs/native-zix.md) reuses ValueDomain inventory and renewal
-filtering through `zix domain list`. Its immutable `native/domain/v*` releases
+[Native adapter](docs/native-zix.md) reuses inventory, DNS record and migration
+libraries through the common `zix domain` entry. Its immutable `native/domain/v*` releases
 have a separate manifest and binary from the standalone CLI `v*` releases.
 Choose the matching owner Release and verify its checksums; the native adapter
-does not advertise the standalone record-session commands.
+uses detached record plan/apply instead of the standalone record-session protocol.

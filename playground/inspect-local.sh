@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Compatibility helper; new workflows use zix domain (docs/native-zix.md).
 # Trusted local host only. Never upload .local or credentials to source/Issues.
 set -euo pipefail
 task_account_id="${1:?Usage: bash playground/inspect-local.sh CLOUDFLARE_ACCOUNT_ID}"

@@ -15,3 +15,8 @@ Run `bash tools/native-release/test-admission.sh` for synthetic admission refusa
 cases. Actual musl builds, protected environments, provenance and anonymous
 dispatcher acceptance are owner CI/release checks, not implied by these fixtures.
 No cloud token or real resource operation is needed to build or publish this module.
+
+Native 0.3.0 changes the manifest to v2 and requires zix >=0.2.4. Package verification
+must include actual dispatcher reads and noninteractive-write refusal; do not
+register a v2 candidate in a production registry before source/release acceptance.
+The operator interface and migration mapping are in `docs/native-zix.md`.

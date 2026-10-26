@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Compatibility helper; new workflows use zix domain (docs/native-zix.md).
 # Read-only comparison of registered-domain DNS and FreeDNS; credentials stay local.
 set -euo pipefail
 task_domain="${1:?Usage: diagnose-dns-local.sh DOMAIN}"

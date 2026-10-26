@@ -23,7 +23,8 @@ impl Scope {
         format!("/zones/{}/dns_records", self.zone)
     }
 }
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Snapshot {
     pub zone: Value,
     pub records: Vec<Value>,

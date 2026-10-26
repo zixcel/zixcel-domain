@@ -30,6 +30,19 @@ pub fn execute(request: &Request) -> Result<Value, Failure> {
             .as_secs();
         return crate::reconciliation::review(&bundle, now).map_err(failure);
     }
+    if matches!(
+        request.operation.as_str(),
+        "dns.inspect"
+            | "dns.delegation"
+            | "dns.export"
+            | "dns.records.plan"
+            | "dns.records.apply"
+            | "nameservers.inspect"
+            | "nameservers.plan"
+            | "nameservers.apply"
+    ) {
+        return crate::operations::execute(request);
+    }
     let domain = zixcel_domain::domain_name(
         request
             .arguments

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Compatibility helper; new workflows use zix domain (docs/native-zix.md).
 # Selected domains only; credentials are inherited by scoped sessions, never saved.
 set -euo pipefail
 task_account="${1:?Usage: domain-batch-local.sh ACCOUNT [--allow-empty-registered-unserved] DOMAIN...}"

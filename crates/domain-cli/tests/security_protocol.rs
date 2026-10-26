@@ -16,6 +16,12 @@ fn public_dns_command_cannot_receive_registrar_secrets_or_mutation_arguments() {
     assert_eq!(c.effect, "read");
     let mut r:Request=serde_json::from_value(json!({"schema":"zix-provider/v1","id":"0".repeat(32),
         "operation":"dns.audit","arguments":{"domain":"example.org"},"limits":{"timeout_ms":5000,"maximum_response_bytes":65536}})).unwrap();
+    r.binding = Some(zix_operation_contracts::Binding::for_catalog(
+        &m.package,
+        &m.version,
+        &serde_json::to_value(&m).unwrap(),
+        &zix_cli::files::digest(&std::fs::read(std::env::current_exe().unwrap()).unwrap()),
+    ));
     assert!(validate_request(&m, &r).is_ok());
     r.arguments
         .insert("url".into(), "https://other.invalid".into());
