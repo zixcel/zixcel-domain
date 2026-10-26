@@ -70,7 +70,7 @@ fn edited(before: &StoredDns, c: &Change) -> Result<StoredDns> {
         if before
             .records
             .split_inclusive('\n')
-            .filter(|s| s.trim_end_matches('\n') == line)
+            .filter(|s| s.trim_end_matches(['\r', '\n']) == line)
             .count()
             != 1
         {
@@ -79,7 +79,11 @@ fn edited(before: &StoredDns, c: &Change) -> Result<StoredDns> {
     }
     let mut text = String::new();
     for chunk in before.records.split_inclusive('\n') {
-        if !c.remove.iter().any(|s| s == chunk.trim_end_matches('\n')) {
+        if !c
+            .remove
+            .iter()
+            .any(|s| s == chunk.trim_end_matches(['\r', '\n']))
+        {
             text.push_str(chunk);
         }
     }

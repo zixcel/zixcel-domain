@@ -6,6 +6,13 @@ version=${1:?Usage: install-native-local.sh VERSION}
 [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || exit 2
 command -v zix >/dev/null
 command -v gh >/dev/null
+python3 - <<'PY_VERSION'
+import re,subprocess
+value=subprocess.check_output(['zix','version'],text=True).strip()
+m=re.fullmatch(r'zix (\d+)\.(\d+)\.(\d+)',value)
+if not m or tuple(map(int,m.groups())) < (0,2,4):
+    raise SystemExit('zix >=0.2.4 is required before replacing the Domain extension')
+PY_VERSION
 base_dir="${XDG_DATA_HOME:-$HOME/.local/share}/zix/packages"
 install -d -m 700 "$base_dir"
 package_dir=$(mktemp -d "$base_dir/domain-$version.XXXXXXXX")
@@ -41,6 +48,12 @@ executable="$(dirname "$manifest")/zix-domain"
   sha256sum --check CONTENTS.sha256
   ./zix-domain --manifest > observed-manifest.json
   cmp domain.extension.json observed-manifest.json
+  python3 - "$version" <<'PY_MANIFEST'
+import json,sys
+m=json.load(open('domain.extension.json'))
+if (m['namespace'],m['version'],m['schema'],m['platform']) != ('domain',sys.argv[1],'zix-extension/v2','linux-x86_64'):
+    raise SystemExit('unexpected Domain release identity')
+PY_MANIFEST
 )
 # Save enough registration evidence to restore the previous verified package if needed.
 zix describe domain --format json > "$package_dir/previous-manifest.json" 2> "$package_dir/previous-error.json" && installed=true || installed=false

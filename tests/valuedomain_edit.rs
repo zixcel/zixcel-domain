@@ -153,3 +153,20 @@ fn cname_collision_and_ambiguous_removal_refuse() {
     };
     assert!(vd::plan(&mut t, "example.test", Namespace::Registered, c).is_err());
 }
+
+#[test]
+fn crlf_source_removes_selected_line_without_normalizing_unselected_bytes() {
+    let mut t = fake(Namespace::Registered);
+    t.text = "a @ 192.0.2.1\r\ntxt @ \"v=spf1 -all\"\r\n".into();
+    let p = vd::plan(
+        &mut t,
+        "example.test",
+        Namespace::Registered,
+        Change {
+            add: vec![],
+            remove: vec!["a @ 192.0.2.1".into()],
+        },
+    )
+    .unwrap();
+    assert_eq!(p.after.records, "txt @ \"v=spf1 -all\"\r\n");
+}

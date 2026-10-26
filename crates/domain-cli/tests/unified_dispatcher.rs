@@ -109,3 +109,79 @@ fn actual_dispatcher_installs_v2_provider_routes_reads_and_refuses_unattended_wr
     let v: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(v["error"], "unsupported_dns_query");
 }
+#[test]
+fn real_terminal_approval_and_profile_binding_stop_before_provider_access() {
+    use std::io::Write;
+    use zix_operation_contracts::{Binding, LocalPlan};
+    let c = Context::new();
+    let manifest = serde_json::to_value(zixcel_domain_cli::manifest()).unwrap();
+    let binding = Binding::for_catalog(
+        "zixcel-domain-cli",
+        env!("CARGO_PKG_VERSION"),
+        &manifest,
+        &zix_cli::files::digest(&fs::read(env!("CARGO_BIN_EXE_zix-domain")).unwrap()),
+    );
+    let profile: Value = serde_json::from_slice(&fs::read(&c.profile).unwrap()).unwrap();
+    let plan = LocalPlan::new(
+        "dns.records.apply".into(),
+        binding,
+        json!({"profile":profile,"profile_sha256":"0".repeat(64),"change":{}}),
+    );
+    let file = c.root.join("plan.json");
+    fs::write(&file, serde_json::to_vec(&plan).unwrap()).unwrap();
+    fs::set_permissions(&file, fs::Permissions::from_mode(0o600)).unwrap();
+    let quote = |s: &str| format!("'{}'", s.replace('\'', "'\\''"));
+    let command = [
+        env!("CARGO_BIN_EXE_dispatcher-probe"),
+        "domain",
+        "dns",
+        "records",
+        "apply",
+        "--profile",
+        c.profile.to_str().unwrap(),
+        "--plan-file",
+        file.to_str().unwrap(),
+        "--approval-sha256",
+        &plan.digest(),
+        "--journal-directory",
+        c.root.to_str().unwrap(),
+    ]
+    .into_iter()
+    .map(quote)
+    .collect::<Vec<_>>()
+    .join(" ");
+    for accepted in [false, true] {
+        let mut child = Command::new("script")
+            .args(["--quiet", "--return", "--command", &command, "/dev/null"])
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .env("XDG_CONFIG_HOME", &c.root)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        writeln!(
+            child.stdin.take().unwrap(),
+            "{}",
+            if accepted {
+                plan.digest()
+            } else {
+                String::new()
+            }
+        )
+        .unwrap();
+        let out = child.wait_with_output().unwrap();
+        let output = String::from_utf8_lossy(&out.stdout);
+        assert!(
+            output.contains(if accepted {
+                "plan_scope_mismatch"
+            } else {
+                "approval_declined"
+            }),
+            "{output}"
+        );
+        assert!(!c.root.join("example.test.active").exists());
+        assert!(!c.root.join(format!("{}.attempt", plan.digest())).exists());
+    }
+}
