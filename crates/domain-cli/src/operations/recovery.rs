@@ -87,12 +87,12 @@ pub(super) fn execute(
     let Target::Valuedomain { namespace } = &profile.target else {
         return Err(Error("unsupported_resolution_target").into());
     };
-    let mut t = http(Provider::ValueDomain, deadline)?;
     let journal = Journal::open(Path::new(&profile.journal_directory))?;
     if r.operation == "dns.records.resolve.plan" {
         let path = arg("original-plan-file")?;
         let (hash, p) = original(path, &profile, &profile_hash)?;
         journal.pending(&hash, &profile.domain)?;
+        let mut t = http(Provider::ValueDomain, deadline)?;
         let observation =
             valuedomain_edit::read(&mut t, &profile.domain, namespace).map_err(fail)?;
         observed(&p, &observation)?;
@@ -145,6 +145,7 @@ pub(super) fn execute(
         return Err(Error("original_plan_changed").into());
     }
     journal.pending(&hash, &profile.domain)?;
+    let mut t = http(Provider::ValueDomain, deadline)?;
     let current = valuedomain_edit::read(&mut t, &profile.domain, namespace).map_err(fail)?;
     observed(&p, &current)?;
     if current != resolution.observation {
