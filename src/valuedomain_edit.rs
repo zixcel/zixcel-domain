@@ -59,6 +59,16 @@ fn edited(before: &StoredDns, c: &Change) -> Result<StoredDns> {
         {
             return Err(error("invalid_or_duplicate_line"));
         }
+        // A provider may store a zero-priority MX with its priority missing.
+        // Permit its exact removal only, never adding malformed source text.
+        let words: Vec<_> = line.split_whitespace().collect();
+        if c.remove.contains(line)
+            && words.len() == 2
+            && words[0] == "mx"
+            && crate::domain_name(words[1].trim_end_matches('.')).is_ok()
+        {
+            continue;
+        }
         let parsed = dns_import::parse(&before.domain, ttl, line)?;
         if parsed.len() != 1
             || !matches!(parsed[0].record_type, "A" | "AAAA" | "CNAME" | "TXT" | "MX")
@@ -149,6 +159,7 @@ pub fn plan(
 ) -> Result<Plan> {
     let before = read(t, domain, &namespace)?;
     let after = edited(&before, &change)?;
+    safe_priority(&before, &change)?;
     let now = approval::now()?;
     Ok(Plan {
         namespace,
@@ -162,6 +173,7 @@ pub fn plan(
 }
 /// Caller must bind executable/profile and durably consume the approval first.
 pub fn apply(p: &Plan, t: &mut impl WriteTransport) -> Result<Value> {
+    safe_priority(&p.before, &p.change)?;
     let check_time = || -> Result<()> {
         let now = approval::now()?;
         if p.created_at > now
@@ -203,4 +215,28 @@ pub fn apply(p: &Plan, t: &mut impl WriteTransport) -> Result<Value> {
             json!({"status":"outcome_unknown","writes_attempted":1,"error":e,"blind_replay_allowed":false})
         }
     })
+}
+
+fn safe_priority(before: &StoredDns, change: &Change) -> Result<()> {
+    for line in &change.add {
+        let ttl = u32::try_from(before.ttl).map_err(|_| error("invalid_dns"))?;
+        for record in dns_import::parse(&before.domain, ttl, line)? {
+            if record.record_type == "MX" && record.priority == Some(0) {
+                return Err(error("zero_mx_priority_not_roundtrip_safe"));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Validate a saved plan without provider access; historical inspection uses its creation time.
+pub fn validate_plan(p: &Plan, now: u64) -> Result<()> {
+    if p.created_at > now || p.expires_at != p.created_at.saturating_add(300) || now >= p.expires_at
+    {
+        return Err(error("expired_or_modified_plan"));
+    }
+    if edited(&p.before, &p.change)? != p.after {
+        return Err(error("invalid_plan"));
+    }
+    Ok(())
 }

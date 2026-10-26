@@ -170,3 +170,59 @@ fn crlf_source_removes_selected_line_without_normalizing_unselected_bytes() {
     .unwrap();
     assert_eq!(p.after.records, "txt @ \"v=spf1 -all\"\r\n");
 }
+
+#[test]
+fn provider_truncated_mx_is_replaced_without_changing_other_zone_bytes() {
+    let mut t = fake(Namespace::Registered);
+    t.text.push_str("mx mail.example.test. \n");
+    let keep = t.text.clone();
+    let change = Change {
+        remove: vec!["mx mail.example.test. ".into()],
+        add: vec!["mx mail.example.test. 10".into()],
+    };
+    let p = vd::plan(&mut t, "example.test", Namespace::Registered, change).unwrap();
+    assert_eq!(
+        p.after.records,
+        keep.replace("mx mail.example.test. \n", "mx mail.example.test. 10\n")
+    );
+    assert_eq!(p.after.ttl, p.before.ttl);
+    assert_eq!(p.after.ns_type, p.before.ns_type);
+    assert_eq!(
+        vd::apply(&p, &mut t).unwrap()["status"],
+        "provider_verified"
+    );
+    assert_eq!(t.writes, 1);
+}
+#[test]
+fn malformed_additions_and_unsafe_zero_priority_never_reach_a_write() {
+    for line in ["mx mail.example.test. ", "mx mail.example.test. 0"] {
+        let mut t = fake(Namespace::Registered);
+        assert!(
+            vd::plan(
+                &mut t,
+                "example.test",
+                Namespace::Registered,
+                Change {
+                    add: vec![line.into()],
+                    remove: vec![]
+                }
+            )
+            .is_err()
+        );
+        assert_eq!(t.writes, 0);
+    }
+    let mut t = fake(Namespace::Registered);
+    t.text.push_str("ns broken.example.test.\n");
+    assert!(
+        vd::plan(
+            &mut t,
+            "example.test",
+            Namespace::Registered,
+            Change {
+                add: vec![],
+                remove: vec!["ns broken.example.test.".into()]
+            }
+        )
+        .is_err()
+    );
+}

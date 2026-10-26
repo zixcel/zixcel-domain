@@ -1,4 +1,5 @@
 use crate::journal::{self, Journal};
+mod recovery;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 use std::{
@@ -150,6 +151,9 @@ pub fn execute(r: &Request) -> Result<Value, Failure> {
     // Raw profile digest also detects any file edit between plan and apply.
     let profile_hash =
         zix_cli::files::digest(&zix_cli::files::read(Path::new(path), 32 * 1024, false)?);
+    if r.operation.starts_with("dns.records.resolve.") {
+        return recovery::execute(r, profile, profile_hash, deadline);
+    }
     let migration = r.operation.starts_with("nameservers.");
     if migration != matches!(profile.target, Target::Migration { .. }) {
         return Err(Error("profile_operation_mismatch").into());
