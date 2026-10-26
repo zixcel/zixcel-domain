@@ -5,10 +5,11 @@ pub use crate::record_execution::{Receipt, ReceiptState};
 pub use crate::record_snapshot::{Scope, Snapshot};
 use crate::transport::{ReadTransport, RecordWriteTransport};
 use crate::{Result, approval, domain_release::digest, error, record_execution, record_snapshot};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RecordPlan {
     pub implementation_version: String,
     pub implementation_source_sha: Option<String>,
@@ -99,3 +100,39 @@ impl Editor {
 #[cfg(test)]
 #[path = "record_editor_tests.rs"]
 mod tests;
+
+/// Detached native operation. The caller owns terminal approval and durable one-use admission.
+/// Reuses the same record, DMARC, complete snapshot and readback checks as the session.
+pub fn apply_reviewed(
+    plan: &RecordPlan,
+    transport: &mut impl RecordWriteTransport,
+) -> Result<Receipt> {
+    if plan.implementation_version != env!("CARGO_PKG_VERSION")
+        || plan.created_at > approval::now()?
+        || plan.expires_at != plan.created_at.saturating_add(300)
+        || approval::now()? >= plan.expires_at
+    {
+        return Err(error("expired_or_modified_plan"));
+    }
+    let scope = plan.scope.clone().validate()?;
+    if scope != plan.scope {
+        return Err(error("invalid_scope"));
+    }
+    let edit = plan.edit.clone().normalize(&scope)?;
+    if serde_json::to_value(&edit).ok() != serde_json::to_value(&plan.edit).ok() {
+        return Err(error("invalid_plan"));
+    }
+    let before = record_snapshot::read(transport, &scope)?;
+    if before != plan.before {
+        return Err(error("snapshot_drift"));
+    }
+    edit.validate(&before)?;
+    crate::dmarc::edit::validate(&scope, &before, &edit)?;
+    if approval::now()? >= plan.expires_at {
+        return Err(error("expired_plan"));
+    }
+    Ok(record_execution::execute(plan, &digest(plan)?, transport))
+}
+pub fn snapshot(scope: Scope, transport: &mut impl ReadTransport) -> Result<Snapshot> {
+    record_snapshot::read(transport, &scope.validate()?)
+}

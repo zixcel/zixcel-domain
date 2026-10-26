@@ -101,7 +101,8 @@ pub struct DomainSettings {
     pub stored_dns_ttl: u64,
     pub authority_verified: bool,
 }
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct StoredDns {
     pub domain: String,
     pub records: String,

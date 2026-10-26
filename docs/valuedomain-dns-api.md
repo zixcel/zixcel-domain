@@ -14,3 +14,16 @@ Reference: https://www.value-domain.com/api/doc/domain/ (v1). The current tool u
 The migration session follows parent referrals from fixed DNS root servers and chooses the namespace from that delegation. Child-zone NS and SOA names are retained as observations, not used to select a namespace. Registered DNS matching the delegated service is preferred; FreeDNS is queried only for delegated ns1–ns5 when the registered export has another namespace. Parent delegation is included in the one-use plan snapshot and read again before writes. Mail/DNSSEC/source-drift checks still apply. Public recursive MX/TXT queries are not a complete zone export.
 
 `zixcel-domain public-delegation coela.org` performs the same credential-free observation. The DNS wire format is handled by hickory-proto; traversal allows at most eight advancing referrals, three IPv4 servers per hop and 18 seconds, with a 4096-byte response cap. Only matching questions/IDs and public IPv4 glue for the referred NS are accepted. Missing glue, IPv6-only delegation, truncation and inaccessible UDP/53 fail closed. This observation is not DNSSEC validation; it does not claim a complete zone inventory.
+
+## Common CLI record writes
+
+`zix domain dns records plan/apply` (native 0.3.0) implements registered DNS and
+FreeDNS exact-line deltas. The complete PUT body preserves service and TTL; the
+namespaces never fall back. See [the operator guide](native-zix.md).
+Official v2 spec rechecked 2026-10-26: `updateDomainDns` accepts `ns_type`, `records`,
+`ttl`; `updateFreeDns` accepts `records`, `ttl` only. No NS delegation change is
+implied by either operation. Unknown source directives cannot be dropped to make
+an edit succeed; unsafe additions stop for review.
+
+Inspected v2 spec SHA256: `8f988c4e58bf3ffb15407b1a49893f57dc82493a43ed1b699df83735a21931ac`.
+Only interface facts were recorded; no provider implementation was copied.

@@ -1,31 +1,157 @@
-# ValueDomain through the common Zix entry
+# Domain operations through Zixcel CLI
 
-The source adds `zix-domain`, a read-only `zix-provider/v1` adapter over the
-existing inventory/renewal library. The existing `zixcel-domain` CLI, DNS editing
-and one-use migration plans keep their own interfaces. No second registrar
-client or schema interpretation is introduced.
+The standard entry is `zix domain …`. There is no `zixcel value-domain` namespace.
+The native `zix-domain` executable is an explicitly installed extension, not a user
+entry point or a wrapper around the legacy executable. It calls the existing Domain
+library. Zixcel CLI owns manifest/executable integrity, bounded process execution
+and interactive operator approval. Domain owns provider semantics, state checks,
+plan expiry, journals and readback. Exchange stays under `zix microsoft …`.
 
-Build with the current Rust toolchain: `cargo build --locked -p zixcel-domain-cli --bin zix-domain`.
-Read `zix-domain --manifest`, then register verified manifest/binary hashes in
-Zix. `zix domain list --exclude-auto-renew-disabled true` reuses the existing
-strict page consistency and effective-renewal checks. Credentials are only
-`ZIX_VALUEDOMAIN_ACCESS_TOKEN` in the selected environment; no old-variable
-fallback or Cloudflare credential is needed. Never put the token in arguments.
-The transport deadline only narrows and the outer Crowsi process budget remains
-in force. Unknown filters/mutations are refused before credentials/HTTP.
+Native 0.3.0 requires zix >=0.2.4 (manifest v2 plus per-command environments).
+The shared SDK/CLI/operation contracts are pinned to public source 8fbd566a.
+A source build is a development candidate; it is not an official owner release.
 
-Returned domains are credential-visible observations, not proof of all account
-rights, authoritative DNS, or permission to change anything. Native CI uses
-synthetic data and missing-credential checks, and prepares a candidate with notices/checksums. Immutable
-`native/domain/v*` tags publish accepted artifacts through the owner release
-workflow and reviewer. Source acceptance, formal distribution and real-account
-validation are separate. No DNS, credential
-or registry operation is performed by source tests.
+## Command coverage and migration
 
-The adapter lives in `crates/domain-cli` as a separate native package.
-The registrar/DNS library keeps its existing Cargo packaging independently.
+| Legacy capability | Standard command | Notes |
+| --- | --- | --- |
+| valuedomain-domains | `zix domain list` | Existing renewal filter retained |
+| valuedomain-settings / nameservers | `zix domain registrar inspect --domain example.org` and `dns export --profile FILE` | Export keeps service namespace explicit |
+| valuedomain-free-dns | `zix domain dns export --profile FILE` | `namespace: free`; no registered/FreeDNS fallback |
+| public-dns | `zix domain dns inspect --domain example.org --type MX` | A/AAAA/CNAME/NS/SOA/DS/DNSKEY/MX/TXT/CAA; recursive evidence |
+| public-delegation | `zix domain dns delegation --domain example.org` | Bounded parent referrals; not DNSSEC validation |
+| record-session | `zix domain dns records plan` / `apply` | Cloudflare typed edit, or ValueDomain line delta |
+| domain-session / domain-control | `zix domain nameservers inspect` / `plan` / `apply` | Migration profile; prepare_zone and change_nameservers remain separate |
+| DNS security / reconciliation | `zix domain dns audit` / `reconcile` | Existing behavior retained |
+| mapping/import/security.txt offline previews | Library and compatibility CLI | No new executable permission implied; not required for record operations |
 
-Original JNI license files omitted by their crate archives are retained under
-`tools/native-release/notices`, with exact upstream commit/URL/hash provenance.
-Both the native candidate and the existing standalone release workflow use the
-same fail-closed notice collector; existing release bytes are not rewritten.
+Legacy CLI/socket interfaces remain compatible during migration. Existing legacy
+in-memory approvals cannot be imported into native apply. New operational scripts
+must use the common entry. No sibling checkout is required at runtime.
+
+## Private profiles and credentials
+
+Provision one stable private profile and journal per operational domain. Directory
+0700, files 0600; use canonical absolute paths outside source control. Do not create
+another journal to bypass a consumed plan or unresolved lock. Same-user local
+processes remain trusted; these files are not a cryptographic authority.
+
+ValueDomain profile:
+
+```json
+{"domain":"example.org","target":{"provider":"valuedomain","namespace":"registered"},"journal_directory":"/absolute/private/domain/journal"}
+```
+
+Use `namespace: free` only for the separate FreeDNS namespace. An authenticated
+export is storage evidence, not proof that these servers are authoritative.
+Before changing records compare registrar NS, parent delegation and public DNS.
+
+Cloudflare profile:
+
+```json
+{"domain":"example.org","target":{"provider":"cloudflare","account":"00000000000000000000000000000001","zone":"00000000000000000000000000000002"},"journal_directory":"/absolute/private/domain/journal"}
+```
+
+Migration profile:
+
+```json
+{"domain":"example.org","target":{"provider":"migration","account":"00000000000000000000000000000001","allow_empty_registered_unserved":false,"retire_unused_mail":false},"journal_directory":"/absolute/private/domain/journal"}
+```
+
+Only the selected existing credentials are needed: `ZIX_VALUEDOMAIN_ACCESS_TOKEN`
+(VDAPI v2), `ZIX_CLOUDFLARE_API_TOKEN`, or both for migration. Resolve them through
+the existing trusted custody boundary, never arguments, JSON, source or logs.
+No old-variable fallback, implicit login, token minting or permission grant exists.
+The shared profile commands allow both declared credential variables into their
+trusted child; leave an unrelated provider's variable unset. Inventory inherits
+only the ValueDomain variable; public DNS inherits neither.
+
+## Export, plan, apply
+
+```sh
+umask 077
+zix domain dns export --profile /absolute/private/domain/profile.json > /absolute/private/domain/before.json
+zix domain dns records plan --profile /absolute/private/domain/profile.json --change-file /absolute/private/domain/change.json > /absolute/private/domain/planned.json
+jq '.result.plan' /absolute/private/domain/planned.json > /absolute/private/domain/plan.json
+jq -r '.result.sha256' /absolute/private/domain/planned.json
+zix domain dns records apply --profile /absolute/private/domain/profile.json --plan-file /absolute/private/domain/plan.json --approval-sha256 REVIEWED_SHA256 --journal-directory /absolute/private/domain/journal
+```
+
+Inspect the full envelope, profile, before/after or typed edit and hash. Apply
+requires a real terminal and asks the operator to enter the exact reviewed hash.
+The profile bytes, executable, package/version, manifest, operation and inner
+payload are bound to the plan. Profile edits require a fresh plan. Record plans
+expire after five minutes, migration plans after ten. Each apply re-reads state.
+
+ValueDomain change JSON uses exact existing lines for removal and reviewed new
+lines for addition. Replacement is remove+add, not a full replacement text input:
+
+```json
+{"add":["txt _dmarc \"v=DMARC1; p=none\""],"remove":[]}
+```
+
+Registered DNS PUT preserves `ns_type` and TTL. FreeDNS PUT omits `ns_type` and
+preserves TTL. Unselected line bytes remain intact. Unknown directives are never
+silently dropped; additions fail when unrecognized non-comment syntax prevents
+conflict analysis. Removal of recognized exact lines may retain unknown lines.
+A/AAAA/CNAME/TXT/MX edits only; no implicit NS, DNSSEC or TTL change. Whole-zone
+PUT cannot exclude another external administrator racing after the pre-read.
+Readback must match the complete desired snapshot; even formatting differences
+require reconciliation. Max 50 selected lines, 100 KB source/target text.
+
+Cloudflare change JSON retains the existing typed create/update/delete contract:
+
+```json
+{"action":"create","record":{"type":"TXT","name":"_dmarc.example.org","content":"v=DMARC1; p=none","ttl":3600,"proxied":false}}
+```
+
+Existing DNS record validation, DMARC checks and metadata preservation are reused.
+
+Migration uses `nameservers inspect --profile FILE`, then
+`nameservers plan --profile FILE --phase prepare_zone`, followed by
+`nameservers apply` with the same approval/file/journal flags. Independently review
+a second `change_nameservers` plan after copy verification. Mail preservation,
+DNSSEC checks, source export/parent delegation, target account checks and explicit
+empty-domain/mail-retirement policy remain enforced. No automatic phase advance.
+
+The common provider response limit is 128 KiB. Oversized plans are rejected
+before any write; do not truncate the source/export to fit the budget.
+
+## Receipts, failures and acceptance
+
+A durable attempt marker is consumed before provider access; a domain lock blocks
+concurrent native applies using this profile's journal. Verified completion writes
+a private receipt and releases the lock. Unknown effects, process termination or
+provider errors retain the lock. Inspect receipts and independently export/read
+provider state before operator-led reconciliation; never delete markers or switch
+journals merely to retry. No automatic cleanup or blind retry command exists.
+
+Provider readback is not public propagation, DNSSEC validation, website or email
+acceptance. Check authoritative/public DNS and external mail delivery separately.
+Rollback is a fresh reviewed inverse change using the saved export, never a replay.
+Live token rights and provider effects are not established by synthetic tests.
+
+## Build and distribution
+
+Development verification:
+
+```sh
+cargo fmt --all --check
+cargo test --locked --workspace --all-targets --all-features
+cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+cargo build --locked --release -p zixcel-domain-cli --bin zix-domain --target x86_64-unknown-linux-musl
+```
+
+Owner releases use `native/domain/v0.3.0` after the same source passes main native
+CI. The existing packaging workflow binds manifest, binary hashes and notices.
+Use the official immutable archive, verify SHA256SUMS and CONTENTS.sha256, compare
+`zix-domain --manifest` with `domain.extension.json`, and explicitly replace the
+old registration via `zix extensions remove domain` / `extensions add` with both
+verified hashes. Do not overwrite old release assets. Candidate testing uses an
+isolated `XDG_CONFIG_HOME`; a missing official asset is not a source-install fallback.
+
+For an explicitly selected official version, `bash playground/install-native-local.sh
+0.3.0` downloads the archive, checks its archive/content hashes and manifest, keeps
+a private previous-registration snapshot and replaces only the Domain registration.
+A failed download or check stops before registry changes. Checksums alone do not
+establish cryptographic provenance; also inspect the owner CI/release record.

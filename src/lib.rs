@@ -25,6 +25,7 @@ pub mod security_cli;
 pub mod security_txt;
 pub mod transport;
 pub mod valuedomain;
+pub mod valuedomain_edit;
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;

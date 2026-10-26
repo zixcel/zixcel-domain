@@ -498,6 +498,40 @@ impl Session {
             ),
         }
     }
+    /// Native detached plans are independently re-derived before being admitted to the
+    /// existing executor. Caller must durably consume approval before this method.
+    pub fn apply_reviewed(
+        plan: Plan,
+        registrar: &mut impl WriteTransport,
+        dns: &mut impl WriteTransport,
+        public: &mut impl ReadTransport,
+    ) -> Result<Value> {
+        let timestamp = now()?;
+        if plan.implementation_version != env!("CARGO_PKG_VERSION")
+            || plan.created_at > timestamp
+            || plan.expires_at != plan.created_at.saturating_add(600)
+            || timestamp >= plan.expires_at
+        {
+            return Err(error("expired_or_modified_plan"));
+        }
+        let mut session = Self::new(&plan.domain, &plan.account)?;
+        session.allow_empty_unserved =
+            plan.source.source_mode == SourceMode::EmptyRegisteredUnserved;
+        session.retire_unused_mail = plan.retire_unused_mail;
+        let generated = session.plan(&plan.phase, registrar, dns, public)?;
+        let mut expected: Plan =
+            serde_json::from_value(generated["plan"].clone()).map_err(|_| error("invalid_plan"))?;
+        expected.created_at = plan.created_at;
+        expected.expires_at = plan.expires_at;
+        expected.nonce = plan.nonce.clone();
+        if digest(&expected)? != digest(&plan)? {
+            return Err(error("snapshot_drift"));
+        }
+        session.issued.clear();
+        let hash = digest(&plan)?;
+        session.issued.insert(hash.clone(), plan);
+        session.apply(&hash, registrar, dns, public)
+    }
     fn perform(
         &self,
         plan: &Plan,

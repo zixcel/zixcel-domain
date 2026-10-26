@@ -677,3 +677,29 @@ fn plan_digest_has_stable_lowercase_hex_bytes_across_digest_versions() {
         "bc5ba0430d0027e94b5ecbe0354e46d3356f0b074c16c639f9fbbe3cf89b895e"
     );
 }
+#[test]
+fn native_migration_plan_roundtrip_rederives_policy_and_rejects_drift() {
+    let mut r = Registrar::new();
+    let mut d = Dns::new();
+    let mut p = Public {
+        ds: false,
+        delegated_11: true,
+    };
+    let mut s = Session::new("example.test", ACCOUNT).unwrap();
+    let v = s.plan("prepare_zone", &mut r, &mut d, &mut p).unwrap();
+    let plan = serde_json::from_value(v["plan"].clone()).unwrap();
+    let receipt = Session::apply_reviewed(plan, &mut r, &mut d, &mut p).unwrap();
+    assert_eq!(receipt["status"], "provider_verified");
+    let v = s
+        .plan("change_nameservers", &mut r, &mut d, &mut p)
+        .unwrap();
+    let plan = serde_json::from_value(v["plan"].clone()).unwrap();
+    r.records = r.records.replace("203.0.113.1", "203.0.113.2");
+    assert_eq!(
+        Session::apply_reviewed(plan, &mut r, &mut d, &mut p)
+            .unwrap_err()
+            .code,
+        "snapshot_drift"
+    );
+    assert_eq!(r.puts, 0);
+}

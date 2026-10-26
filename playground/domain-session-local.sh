@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Compatibility helper; new workflows use zix domain (docs/native-zix.md).
 set -euo pipefail
 task_domain="${1:?Usage: domain-session-local.sh DOMAIN CLOUDFLARE_ACCOUNT_ID}"
 task_account="${2:?Usage: domain-session-local.sh DOMAIN CLOUDFLARE_ACCOUNT_ID}"

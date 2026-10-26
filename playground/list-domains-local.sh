@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Compatibility helper; new workflows use zix domain (docs/native-zix.md).
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 task_binary="${ZIXCEL_DOMAIN_BIN:-${HOME}/.local/bin/zixcel-domain}"
