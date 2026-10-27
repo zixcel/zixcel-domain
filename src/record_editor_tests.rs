@@ -88,3 +88,70 @@ fn deserializers_refuse_unreviewed_fields_and_unknown_operations() {
     );
     assert!(serde_json::from_value::<Edit>(json!({"action":"delete_zone"})).is_err());
 }
+
+#[test]
+fn historical_creation_reconciliation_requires_exact_acknowledgement_and_no_drift() {
+    let (editor, _) = issued(300, Instant::now());
+    let mut plan = editor.issued.unwrap().plan;
+    let id = "4".repeat(32);
+    plan.edit = Edit::Create {
+        record: RecordData {
+            kind: RecordType::TXT,
+            name: "example.test".into(),
+            content: "MS=synthetic".into(),
+            ttl: 3600,
+            proxied: false,
+            priority: None,
+        },
+    };
+    let target = json!({"id":id,"type":"TXT","name":"example.test","content":"MS=synthetic","ttl":3600,"proxied":false});
+    let after = Snapshot {
+        zone: plan.before.zone.clone(),
+        records: vec![target.clone()],
+    };
+    // Old approval is never replayed; only the observed outcome is checked.
+    assert!(verify_observed(&plan, &id, &after).is_ok());
+    assert!(verify_observed(&plan, &"5".repeat(32), &after).is_err());
+    let mut changed = after.clone();
+    changed.records[0]["content"] = json!("wrong");
+    assert!(verify_observed(&plan, &id, &changed).is_err());
+    changed = after.clone();
+    changed.records.push(json!({"id":"6".repeat(32)}));
+    assert!(verify_observed(&plan, &id, &changed).is_err());
+    changed = after.clone();
+    changed.zone = json!({"id":"wrong"});
+    assert!(verify_observed(&plan, &id, &changed).is_err());
+    plan.before.records.push(target);
+    assert!(verify_observed(&plan, &id, &after).is_err());
+}
+
+#[test]
+fn historical_update_reconciliation_preserves_unrelated_records_and_metadata() {
+    let (editor, _) = issued(300, Instant::now());
+    let mut plan = editor.issued.unwrap().plan;
+    let id = "4".repeat(32);
+    let original = json!({"id":id,"type":"TXT","name":"example.test","content":"old","ttl":60,"proxied":false,"comment":"retain"});
+    plan.before.records = vec![original.clone()];
+    plan.edit = Edit::Update {
+        record_id: id.clone(),
+        record: RecordData {
+            kind: RecordType::TXT,
+            name: "example.test".into(),
+            content: "new".into(),
+            ttl: 3600,
+            proxied: false,
+            priority: None,
+        },
+    };
+    let mut record = original;
+    record["content"] = json!("new");
+    record["ttl"] = json!(3600);
+    let mut after = Snapshot {
+        zone: plan.before.zone.clone(),
+        records: vec![record],
+    };
+    assert!(verify_observed(&plan, &id, &after).is_ok());
+    after.records[0]["comment"] = json!("removed");
+    assert!(verify_observed(&plan, &id, &after).is_err());
+    assert!(verify_observed(&plan, &"5".repeat(32), &after).is_err());
+}
