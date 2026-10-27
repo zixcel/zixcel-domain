@@ -14,7 +14,7 @@ fn public_dns_command_cannot_receive_registrar_secrets_or_mutation_arguments() {
     );
     assert!(c.required_permissions.is_empty());
     assert_eq!(c.effect, "read");
-    let mut r:Request=serde_json::from_value(json!({"schema":"zix-provider/v1","id":"0".repeat(32),
+    let mut r:Request=serde_json::from_value(json!({"schema":"zix-provider/v2","id":"0".repeat(32),
         "operation":"dns.audit","arguments":{"domain":"example.org"},"limits":{"timeout_ms":5000,"maximum_response_bytes":65536}})).unwrap();
     r.binding = Some(zix_operation_contracts::Binding::for_catalog(
         &m.package,

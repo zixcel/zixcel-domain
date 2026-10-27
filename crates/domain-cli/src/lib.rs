@@ -9,3 +9,8 @@ pub mod reconciliation;
 
 mod journal;
 mod operations;
+
+pub fn guidance() -> zix_native_provider::Result<zix_native_provider::GuidanceCatalog> {
+    let manifest = manifest();
+    zix_native_provider::guidance::catalog(&manifest, include_bytes!("../api/guidance.json"))
+}

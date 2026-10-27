@@ -1,6 +1,6 @@
 [package]
 name = "zixcel-domain-cli"
-version = "0.3.3"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.97"
 license = "Apache-2.0"
@@ -12,12 +12,12 @@ name = "zix-domain"
 path = "src/main.rs"
 [dependencies]
 zixcel-domain = { path = "../.." }
-zix-native-provider = { git = "https://github.com/zixcel/cli", rev = "8fbd566aa53a52d4a588fef537683be2a604b02a" }
-zix-cli = { git = "https://github.com/zixcel/cli", rev = "8fbd566aa53a52d4a588fef537683be2a604b02a" }
+zix-native-provider = { git = "https://github.com/zixcel/cli", rev = "c00dcd435d147c43cc6a6cb93a0e667d33a6d297" }
+zix-cli = { git = "https://github.com/zixcel/cli", rev = "c00dcd435d147c43cc6a6cb93a0e667d33a6d297" }
 serde_json = "1"
 zixcel-cloudflare-observer = { git = "https://github.com/zixcel/zixcel-cloudflare", rev = "2d931b06c7638a520f008526bb66c71cb438d8ba" }
 serde = { version = "1", features = ["derive"] }
-zix-operation-contracts = { git = "https://github.com/zixcel/cli", rev = "8fbd566aa53a52d4a588fef537683be2a604b02a" }
+zix-operation-contracts = { git = "https://github.com/zixcel/cli", rev = "c00dcd435d147c43cc6a6cb93a0e667d33a6d297" }
 tokio = { version = "1", features = ["rt", "time", "io-util", "signal"] }
 [dev-dependencies]
 sha2 = "0.11"

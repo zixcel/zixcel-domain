@@ -1777,8 +1777,8 @@ dependencies = [
 
 [[package]]
 name = "zix-cli"
-version = "0.2.4"
-source = "git+https://github.com/zixcel/cli?rev=8fbd566aa53a52d4a588fef537683be2a604b02a#8fbd566aa53a52d4a588fef537683be2a604b02a"
+version = "0.6.0"
+source = "git+https://github.com/zixcel/cli?rev=c00dcd435d147c43cc6a6cb93a0e667d33a6d297#c00dcd435d147c43cc6a6cb93a0e667d33a6d297"
 dependencies = [
  "crowsi-process-adapter",
  "rustix",
@@ -1788,14 +1788,15 @@ dependencies = [
  "sha2",
  "tokio",
  "url",
+ "zeroize",
  "zix-operation-contracts",
  "zixcel-bounded-io",
 ]
 
 [[package]]
 name = "zix-native-provider"
-version = "0.2.0"
-source = "git+https://github.com/zixcel/cli?rev=8fbd566aa53a52d4a588fef537683be2a604b02a#8fbd566aa53a52d4a588fef537683be2a604b02a"
+version = "0.4.0"
+source = "git+https://github.com/zixcel/cli?rev=c00dcd435d147c43cc6a6cb93a0e667d33a6d297#c00dcd435d147c43cc6a6cb93a0e667d33a6d297"
 dependencies = [
  "crowsi-provider-read-http",
  "serde",
@@ -1808,8 +1809,8 @@ dependencies = [
 
 [[package]]
 name = "zix-operation-contracts"
-version = "0.1.0"
-source = "git+https://github.com/zixcel/cli?rev=8fbd566aa53a52d4a588fef537683be2a604b02a#8fbd566aa53a52d4a588fef537683be2a604b02a"
+version = "0.1.1"
+source = "git+https://github.com/zixcel/cli?rev=c00dcd435d147c43cc6a6cb93a0e667d33a6d297#c00dcd435d147c43cc6a6cb93a0e667d33a6d297"
 dependencies = [
  "serde",
  "serde_json",
@@ -1854,7 +1855,7 @@ dependencies = [
 
 [[package]]
 name = "zixcel-domain-cli"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "serde",
  "serde_json",
