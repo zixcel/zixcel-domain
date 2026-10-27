@@ -1,0 +1,687 @@
+[
+  {
+    "operation": "valuedomain.domains.list",
+    "selectors": {},
+    "intent": "read_registrar_visible_domains",
+    "keywords": [
+      "REGISTRAR",
+      "VALUEDOMAIN",
+      "READ"
+    ],
+    "requirements": [
+      {
+        "kind": "audience",
+        "value": "https://api-one.value-domain.com",
+        "subject": "valuedomain_credential"
+      },
+      {
+        "kind": "provider_permission",
+        "value": "ValueDomain v2 selected domain read",
+        "subject": "operation"
+      },
+      {
+        "kind": "context",
+        "value": "registrar ownership does not establish authoritative DNS",
+        "subject": "operation"
+      }
+    ],
+    "next_actions": [
+      {
+        "namespace": "credential",
+        "operation": "help",
+        "purpose": "inspect_secure_credential_usage",
+        "arguments": {},
+        "on": [
+          "context",
+          "authentication"
+        ]
+      }
+    ],
+    "documentation": [
+      "https://one.value-domain.com/doc/api/v2/domain"
+    ]
+  },
+  {
+    "operation": "registrar.inspect",
+    "selectors": {},
+    "intent": "read_registrar_registration",
+    "keywords": [
+      "REGISTRAR",
+      "VALUEDOMAIN",
+      "READ"
+    ],
+    "requirements": [
+      {
+        "kind": "audience",
+        "value": "https://api-one.value-domain.com",
+        "subject": "valuedomain_credential"
+      },
+      {
+        "kind": "provider_permission",
+        "value": "ValueDomain v2 selected domain read",
+        "subject": "operation"
+      },
+      {
+        "kind": "context",
+        "value": "registrar ownership does not establish authoritative DNS",
+        "subject": "operation"
+      }
+    ],
+    "next_actions": [
+      {
+        "namespace": "credential",
+        "operation": "help",
+        "purpose": "inspect_secure_credential_usage",
+        "arguments": {},
+        "on": [
+          "context",
+          "authentication"
+        ]
+      }
+    ],
+    "documentation": [
+      "https://one.value-domain.com/doc/api/v2/domain"
+    ]
+  },
+  {
+    "operation": "dns.audit",
+    "selectors": {},
+    "intent": "read_public_dns_evidence",
+    "keywords": [
+      "DNS",
+      "AUTHORITY",
+      "READ"
+    ],
+    "requirements": [
+      {
+        "kind": "context",
+        "value": "selected domain and available authority evidence",
+        "subject": "operation"
+      }
+    ],
+    "next_actions": [
+      {
+        "namespace": "domain",
+        "operation": "dns.export",
+        "purpose": "read_dns_provider_after_authority_selection",
+        "arguments": {},
+        "on": [
+          "observed"
+        ],
+        "requires_context": {
+          "dns_profile": "selected_after_authority_check"
+        }
+      }
+    ],
+    "documentation": [
+      "https://developers.cloudflare.com/dns/manage-dns-records/",
+      "https://one.value-domain.com/doc/api/v2/domain"
+    ]
+  },
+  {
+    "operation": "dns.inspect",
+    "selectors": {},
+    "intent": "read_public_dns_records",
+    "keywords": [
+      "DNS",
+      "AUTHORITY",
+      "READ"
+    ],
+    "requirements": [
+      {
+        "kind": "context",
+        "value": "selected domain and available authority evidence",
+        "subject": "operation"
+      }
+    ],
+    "next_actions": [
+      {
+        "namespace": "domain",
+        "operation": "dns.export",
+        "purpose": "read_dns_provider_after_authority_selection",
+        "arguments": {},
+        "on": [
+          "observed"
+        ],
+        "requires_context": {
+          "dns_profile": "selected_after_authority_check"
+        }
+      }
+    ],
+    "documentation": [
+      "https://developers.cloudflare.com/dns/manage-dns-records/",
+      "https://one.value-domain.com/doc/api/v2/domain"
+    ]
+  },
+  {
+    "operation": "dns.delegation",
+    "selectors": {},
+    "intent": "read_parent_delegation",
+    "keywords": [
+      "DNS",
+      "AUTHORITY",
+      "READ"
+    ],
+    "requirements": [
+      {
+        "kind": "context",
+        "value": "selected domain and available authority evidence",
+        "subject": "operation"
+      }
+    ],
+    "next_actions": [
+      {
+        "namespace": "domain",
+        "operation": "dns.export",
+        "purpose": "read_dns_provider_after_authority_selection",
+        "arguments": {},
+        "on": [
+          "observed"
+        ],
+        "requires_context": {
+          "dns_profile": "selected_after_authority_check"
+        }
+      }
+    ],
+    "documentation": [
+      "https://developers.cloudflare.com/dns/manage-dns-records/",
+      "https://one.value-domain.com/doc/api/v2/domain"
+    ]
+  },
+  {
+    "operation": "dns.reconcile",
+    "selectors": {},
+    "intent": "compare_dns_observations",
+    "keywords": [
+      "DNS",
+      "AUTHORITY",
+      "READ"
+    ],
+    "requirements": [
+      {
+        "kind": "context",
+        "value": "selected domain and available authority evidence",
+        "subject": "operation"
+      }
+    ],
+    "next_actions": [
+      {
+        "namespace": "domain",
+        "operation": "dns.export",
+        "purpose": "read_dns_provider_after_authority_selection",
+        "arguments": {},
+        "on": [
+          "observed"
+        ],
+        "requires_context": {
+          "dns_profile": "selected_after_authority_check"
+        }
+      }
+    ],
+    "documentation": [
+      "https://developers.cloudflare.com/dns/manage-dns-records/",
+      "https://one.value-domain.com/doc/api/v2/domain"
+    ]
+  },
+  {
+    "operation": "dns.export",
+    "selectors": {},
+    "intent": "read_selected_dns_provider",
+    "keywords": [
+      "DNS",
+      "PROVIDER",
+      "READ"
+    ],
+    "requirements": [
+      {
+        "kind": "context",
+        "value": "current authoritative DNS provider",
+        "subject": "operation"
+      },
+      {
+        "kind": "context",
+        "value": "reviewed registrar and DNS profile",
+        "subject": "operation"
+      },
+      {
+        "kind": "target_scope",
+        "value": "selected provider account and zone",
+        "subject": "provider_resource"
+      }
+    ],
+    "next_actions": [
+      {
+        "namespace": "domain",
+        "operation": "dns.delegation",
+        "purpose": "observe_parent_delegation",
+        "arguments": {},
+        "on": [
+          "context",
+          "incomplete",
+          "observed"
+        ]
+      },
+      {
+        "namespace": "cloudflare",
+        "operation": "dns.audit",
+        "purpose": "inspect_cloudflare_zone_after_provider_selection",
+        "arguments": {},
+        "on": [
+          "authorization",
+          "incomplete"
+        ],
+        "requires_context": {
+          "authoritative_dns_provider": "cloudflare"
+        }
+      }
+    ],
+    "documentation": [
+      "https://developers.cloudflare.com/dns/manage-dns-records/",
+      "https://one.value-domain.com/doc/api/v2/domain"
+    ]
+  },
+  {
+    "operation": "dns.records.plan",
+    "selectors": {},
+    "intent": "plan_selected_dns_records",
+    "keywords": [
+      "DNS",
+      "PROVIDER",
+      "PLAN"
+    ],
+    "requirements": [
+      {
+        "kind": "context",
+        "value": "current authoritative DNS provider",
+        "subject": "operation"
+      },
+      {
+        "kind": "context",
+        "value": "reviewed registrar and DNS profile",
+        "subject": "operation"
+      },
+      {
+        "kind": "target_scope",
+        "value": "selected provider account and zone",
+        "subject": "provider_resource"
+      }
+    ],
+    "next_actions": [
+      {
+        "namespace": "domain",
+        "operation": "dns.delegation",
+        "purpose": "observe_parent_delegation",
+        "arguments": {},
+        "on": [
+          "context",
+          "incomplete",
+          "observed"
+        ]
+      },
+      {
+        "namespace": "cloudflare",
+        "operation": "dns.audit",
+        "purpose": "inspect_cloudflare_zone_after_provider_selection",
+        "arguments": {},
+        "on": [
+          "authorization",
+          "incomplete"
+        ],
+        "requires_context": {
+          "authoritative_dns_provider": "cloudflare"
+        }
+      }
+    ],
+    "documentation": [
+      "https://developers.cloudflare.com/dns/manage-dns-records/",
+      "https://one.value-domain.com/doc/api/v2/domain"
+    ]
+  },
+  {
+    "operation": "dns.records.apply",
+    "selectors": {},
+    "intent": "apply_reviewed_dns_plan",
+    "keywords": [
+      "DNS",
+      "PROVIDER",
+      "APPLY"
+    ],
+    "requirements": [
+      {
+        "kind": "context",
+        "value": "current authoritative DNS provider",
+        "subject": "operation"
+      },
+      {
+        "kind": "context",
+        "value": "reviewed registrar and DNS profile",
+        "subject": "operation"
+      },
+      {
+        "kind": "target_scope",
+        "value": "selected provider account and zone",
+        "subject": "provider_resource"
+      }
+    ],
+    "next_actions": [
+      {
+        "namespace": "domain",
+        "operation": "dns.records.resolve.plan",
+        "purpose": "inspect_original_attempt_before_new_plan",
+        "arguments": {},
+        "on": [
+          "outcome_unknown"
+        ]
+      },
+      {
+        "namespace": "domain",
+        "operation": "dns.export",
+        "purpose": "readback_selected_dns_provider",
+        "arguments": {},
+        "on": [
+          "observed",
+          "incomplete"
+        ],
+        "requires_context": {
+          "dns_profile": "selected_after_authority_check"
+        }
+      }
+    ],
+    "documentation": [
+      "https://developers.cloudflare.com/dns/manage-dns-records/",
+      "https://one.value-domain.com/doc/api/v2/domain"
+    ]
+  },
+  {
+    "operation": "dns.records.resolve.plan",
+    "selectors": {},
+    "intent": "plan_unresolved_dns_reconciliation",
+    "keywords": [
+      "DNS",
+      "PROVIDER",
+      "PLAN"
+    ],
+    "requirements": [
+      {
+        "kind": "context",
+        "value": "current authoritative DNS provider",
+        "subject": "operation"
+      },
+      {
+        "kind": "context",
+        "value": "reviewed registrar and DNS profile",
+        "subject": "operation"
+      },
+      {
+        "kind": "target_scope",
+        "value": "selected provider account and zone",
+        "subject": "provider_resource"
+      }
+    ],
+    "next_actions": [
+      {
+        "namespace": "domain",
+        "operation": "dns.delegation",
+        "purpose": "observe_parent_delegation",
+        "arguments": {},
+        "on": [
+          "context",
+          "incomplete",
+          "observed"
+        ]
+      },
+      {
+        "namespace": "cloudflare",
+        "operation": "dns.audit",
+        "purpose": "inspect_cloudflare_zone_after_provider_selection",
+        "arguments": {},
+        "on": [
+          "authorization",
+          "incomplete"
+        ],
+        "requires_context": {
+          "authoritative_dns_provider": "cloudflare"
+        }
+      }
+    ],
+    "documentation": [
+      "https://developers.cloudflare.com/dns/manage-dns-records/",
+      "https://one.value-domain.com/doc/api/v2/domain"
+    ]
+  },
+  {
+    "operation": "dns.records.resolve.apply",
+    "selectors": {},
+    "intent": "record_reviewed_dns_reconciliation",
+    "keywords": [
+      "DNS",
+      "PROVIDER",
+      "APPLY"
+    ],
+    "requirements": [
+      {
+        "kind": "context",
+        "value": "current authoritative DNS provider",
+        "subject": "operation"
+      },
+      {
+        "kind": "context",
+        "value": "reviewed registrar and DNS profile",
+        "subject": "operation"
+      },
+      {
+        "kind": "target_scope",
+        "value": "selected provider account and zone",
+        "subject": "provider_resource"
+      }
+    ],
+    "next_actions": [
+      {
+        "namespace": "domain",
+        "operation": "dns.records.resolve.plan",
+        "purpose": "inspect_original_attempt_before_new_plan",
+        "arguments": {},
+        "on": [
+          "outcome_unknown"
+        ]
+      },
+      {
+        "namespace": "domain",
+        "operation": "dns.export",
+        "purpose": "readback_selected_dns_provider",
+        "arguments": {},
+        "on": [
+          "observed",
+          "incomplete"
+        ],
+        "requires_context": {
+          "dns_profile": "selected_after_authority_check"
+        }
+      }
+    ],
+    "documentation": [
+      "https://developers.cloudflare.com/dns/manage-dns-records/",
+      "https://one.value-domain.com/doc/api/v2/domain"
+    ]
+  },
+  {
+    "operation": "nameservers.inspect",
+    "selectors": {},
+    "intent": "nameservers_inspect",
+    "keywords": [
+      "REGISTRAR",
+      "DELEGATION"
+    ],
+    "requirements": [
+      {
+        "kind": "provider_permission",
+        "value": "registrar nameserver operations",
+        "subject": "operation"
+      },
+      {
+        "kind": "context",
+        "value": "explicitly reviewed NS change and DNS preservation",
+        "subject": "operation"
+      }
+    ],
+    "next_actions": [
+      {
+        "namespace": "domain",
+        "operation": "dns.delegation",
+        "purpose": "observe_parent_delegation",
+        "arguments": {},
+        "on": [
+          "context",
+          "incomplete",
+          "observed"
+        ]
+      },
+      {
+        "namespace": "cloudflare",
+        "operation": "dns.audit",
+        "purpose": "inspect_cloudflare_zone_after_provider_selection",
+        "arguments": {},
+        "on": [
+          "authorization",
+          "incomplete"
+        ],
+        "requires_context": {
+          "authoritative_dns_provider": "cloudflare"
+        }
+      },
+      {
+        "namespace": "credential",
+        "operation": "help",
+        "purpose": "inspect_secure_credential_usage",
+        "arguments": {},
+        "on": [
+          "context",
+          "authentication"
+        ]
+      }
+    ],
+    "documentation": [
+      "https://one.value-domain.com/doc/api/v2/domain"
+    ]
+  },
+  {
+    "operation": "nameservers.plan",
+    "selectors": {},
+    "intent": "nameservers_plan",
+    "keywords": [
+      "REGISTRAR",
+      "DELEGATION"
+    ],
+    "requirements": [
+      {
+        "kind": "provider_permission",
+        "value": "registrar nameserver operations",
+        "subject": "operation"
+      },
+      {
+        "kind": "context",
+        "value": "explicitly reviewed NS change and DNS preservation",
+        "subject": "operation"
+      }
+    ],
+    "next_actions": [
+      {
+        "namespace": "domain",
+        "operation": "dns.delegation",
+        "purpose": "observe_parent_delegation",
+        "arguments": {},
+        "on": [
+          "context",
+          "incomplete",
+          "observed"
+        ]
+      },
+      {
+        "namespace": "cloudflare",
+        "operation": "dns.audit",
+        "purpose": "inspect_cloudflare_zone_after_provider_selection",
+        "arguments": {},
+        "on": [
+          "authorization",
+          "incomplete"
+        ],
+        "requires_context": {
+          "authoritative_dns_provider": "cloudflare"
+        }
+      },
+      {
+        "namespace": "credential",
+        "operation": "help",
+        "purpose": "inspect_secure_credential_usage",
+        "arguments": {},
+        "on": [
+          "context",
+          "authentication"
+        ]
+      }
+    ],
+    "documentation": [
+      "https://one.value-domain.com/doc/api/v2/domain"
+    ]
+  },
+  {
+    "operation": "nameservers.apply",
+    "selectors": {},
+    "intent": "nameservers_apply",
+    "keywords": [
+      "REGISTRAR",
+      "DELEGATION"
+    ],
+    "requirements": [
+      {
+        "kind": "provider_permission",
+        "value": "registrar nameserver operations",
+        "subject": "operation"
+      },
+      {
+        "kind": "context",
+        "value": "explicitly reviewed NS change and DNS preservation",
+        "subject": "operation"
+      }
+    ],
+    "next_actions": [
+      {
+        "namespace": "domain",
+        "operation": "dns.delegation",
+        "purpose": "observe_parent_delegation",
+        "arguments": {},
+        "on": [
+          "context",
+          "incomplete",
+          "observed"
+        ]
+      },
+      {
+        "namespace": "cloudflare",
+        "operation": "dns.audit",
+        "purpose": "inspect_cloudflare_zone_after_provider_selection",
+        "arguments": {},
+        "on": [
+          "authorization",
+          "incomplete"
+        ],
+        "requires_context": {
+          "authoritative_dns_provider": "cloudflare"
+        }
+      },
+      {
+        "namespace": "credential",
+        "operation": "help",
+        "purpose": "inspect_secure_credential_usage",
+        "arguments": {},
+        "on": [
+          "context",
+          "authentication"
+        ]
+      }
+    ],
+    "documentation": [
+      "https://one.value-domain.com/doc/api/v2/domain"
+    ]
+  }
+]

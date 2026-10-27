@@ -12,7 +12,7 @@ fn request_for(path: &std::path::Path) -> Request {
         &serde_json::to_value(native::manifest()).unwrap(),
         &zix_cli::files::digest(&std::fs::read(path).unwrap()),
     );
-    serde_json::from_value(json!({"schema":"zix-provider/v1","id":"0".repeat(32),"operation":"valuedomain.domains.list",
+    serde_json::from_value(json!({"schema":"zix-provider/v2","id":"0".repeat(32),"operation":"valuedomain.domains.list",
     "arguments":{},"binding":binding,"limits":{"timeout_ms":5000,"maximum_response_bytes":65536}})).unwrap()
 }
 struct Fake {
@@ -77,7 +77,7 @@ fn native_binary_has_no_ambient_credential_fallback_or_node_requirement() {
     );
     let mut child = Command::new(env!("CARGO_BIN_EXE_zix-domain"))
         .env_clear()
-        .arg("--zix-provider-v1")
+        .arg("--zix-provider-v2")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()

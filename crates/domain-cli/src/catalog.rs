@@ -148,5 +148,8 @@ pub fn manifest() -> Manifest {
         credential_environment: vec!["ZIX_VALUEDOMAIN_ACCESS_TOKEN".into()],
         runtime_environment: vec![],
     });
+    m.protocol = "zix-provider/v2".into();
+    zix_native_provider::guidance::decorate(&mut m, include_bytes!("../api/guidance.json"))
+        .expect("reviewed domain guidance");
     m
 }
