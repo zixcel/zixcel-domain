@@ -65,7 +65,16 @@ impl Journal {
             .map_err(|_| Error("invalid_original_receipt"))?;
         if receipt["status"] != "outcome_unknown"
             || receipt["writes_attempted"] != 1
-            || receipt["error"]["code"] != "dns_readback_mismatch"
+            || !matches!(
+                receipt["error"]["code"].as_str(),
+                Some(
+                    "dns_readback_mismatch"
+                        | "incomplete_inventory"
+                        | "inconsistent_inventory"
+                        | "readback_drift"
+                        | "readback_mismatch"
+                )
+            )
         {
             return Err(Error("unsupported_original_outcome"));
         }

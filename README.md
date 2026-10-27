@@ -1,5 +1,8 @@
 # zix domain — local registrar and DNS administration
 
+Local administration: `zix domain --help`. Inspect intent, prerequisites and related
+tools before a remote request: [operation guidance](docs/operation-guidance.md).
+
 Use **`zix domain …`** through the Zixcel CLI as the standard operator entry.
 See [the unified command guide](docs/native-zix.md) for inventory, private profiles,
 DNS export, record plan/apply and nameserver migration. Native 0.3.0 adds these
@@ -289,3 +292,5 @@ libraries through the common `zix domain` entry. Its immutable `native/domain/v*
 have a separate manifest and binary from the standalone CLI `v*` releases.
 Choose the matching owner Release and verify its checksums; the native adapter
 uses detached record plan/apply instead of the standalone record-session protocol.
+
+Operation requirements and related-tool handoffs: [LLM guidance](docs/operation-guidance.md).

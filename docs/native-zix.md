@@ -7,9 +7,20 @@ library. Zixcel CLI owns manifest/executable integrity, bounded process executio
 and interactive operator approval. Domain owns provider semantics, state checks,
 plan expiry, journals and readback. Exchange stays under `zix microsoft …`.
 
-Native 0.3.0 requires zix >=0.2.4 (manifest v2 plus per-command environments).
-The shared SDK/CLI/operation contracts are pinned to public source 8fbd566a.
-A source build is a development candidate; it is not an official owner release.
+The current native release is 0.4.1. Use the released common setup helper and
+CLI 0.7.0 or newer for the current guidance and compact discovery interface:
+
+```sh
+zix-setup install --with domain
+zix extensions inspect domain --format json
+zix capabilities --namespace domain --compact --format json
+```
+
+For OS prerequisites and first installation, follow the
+[shared setup guide](https://zixcel.com/docs/setup). Immutable dependency pins live
+in `crates/domain-cli/Cargo.toml` and `Cargo.lock`; a historical SDK revision is not
+an installation instruction. A source build is a development candidate, not an
+official owner release.
 
 ## Command coverage and migration
 
@@ -74,13 +85,16 @@ zix domain dns export --profile /absolute/private/domain/profile.json > /absolut
 zix domain dns records plan --profile /absolute/private/domain/profile.json --change-file /absolute/private/domain/change.json > /absolute/private/domain/planned.json
 jq '.result.plan' /absolute/private/domain/planned.json > /absolute/private/domain/plan.json
 jq -r '.result.sha256' /absolute/private/domain/planned.json
-zix domain dns records apply --profile /absolute/private/domain/profile.json --plan-file /absolute/private/domain/plan.json --approval-sha256 REVIEWED_SHA256 --journal-directory /absolute/private/domain/journal
+zix domain dns records apply --profile /absolute/private/domain/profile.json --plan-file /absolute/private/domain/plan.json --journal-directory /absolute/private/domain/journal --yes
 ```
 
-Inspect the full envelope, profile, before/after or typed edit and hash. Apply
-requires a real terminal and asks the operator to enter the exact reviewed hash.
-The profile bytes, executable, package/version, manifest, operation and inner
-payload are bound to the plan. Profile edits require a fresh plan. Record plans
+Inspect the full envelope, profile, before/after or typed edit and hash before
+applying. Without `--yes`, Zix asks for `y` or `yes`; `-y` / `--yes` confirms the
+reviewed invocation without a terminal prompt. Manual SHA256 entry is not
+required. Zix computes and supplies the approval digest; an explicit
+`--approval-sha256` remains available when a caller needs to bind an expected
+reviewed digest. The profile bytes, executable, package/version, manifest,
+operation and inner payload remain bound to the plan. Profile edits require a fresh plan. Record plans
 expire after five minutes, migration plans after ten. Each apply re-reads state.
 
 ValueDomain change JSON uses exact existing lines for removal and reviewed new
@@ -142,7 +156,7 @@ cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
 cargo build --locked --release -p zixcel-domain-cli --bin zix-domain --target x86_64-unknown-linux-musl
 ```
 
-Owner releases use `native/domain/v0.3.1` after the same source passes main native
+The current owner release uses `native/domain/v0.4.1` after the same source passes main native
 CI. The existing packaging workflow binds manifest, binary hashes and notices.
 Use the official immutable archive, verify SHA256SUMS and CONTENTS.sha256, compare
 `zix-domain --manifest` with `domain.extension.json`, and explicitly replace the
@@ -151,26 +165,36 @@ observed previous hashes and verified new hashes (zix >=0.2.5). Do not remove th
 old registration first. Disabled state is preserved. Do not overwrite old release assets. Candidate testing uses an
 isolated `XDG_CONFIG_HOME`; a missing official asset is not a source-install fallback.
 
-For an explicitly selected official version, `bash playground/install-native-local.sh
-0.3.1` downloads the archive, checks its archive/content hashes and manifest, keeps
-a private previous-registration snapshot and replaces only the Domain registration.
-A failed download or check stops before registry changes. The helper requires
-zix >=0.2.5, including for fresh installations, and supports both v1 and v2 Domain
-release manifests for explicit rollback. Failed replacement preflight leaves the
-old registration untouched; no snapshot overwrite or separate remove/add is used. Checksums alone do not
-establish cryptographic provenance; also inspect the owner CI/release record.
+### Historical compatibility acceptance
 
-The installer acceptance script `tests/installer-lifecycle.py` takes an official
-released zix executable (with RELEASE.json) and two verified cached Domain releases.
-It checks fresh registration, disabled upgrades, explicit downgrade/re-upgrade and
-corrupt archive refusal in an isolated registry without provider credentials. Native
-CI runs it with CLI 0.2.5 and Domain 0.2.0/0.3.0 release archives. Production
-acceptance should additionally select the newly published Domain release.
+`playground/install-native-local.sh` and `tests/installer-lifecycle.py` are retained
+for explicit-version compatibility testing and deliberate rollback. They are not
+the first-install/update path. The lifecycle test intentionally uses released
+CLI 0.2.5 and Domain 0.2.0/0.3.0 archives to exercise historical upgrade behavior;
+those versions are fixtures, not recommendations for a new environment. Current
+installation and provenance verification use the shared setup helper above.
 
 ## Recover a ValueDomain MX priority normalization
 
-Native 0.3.2 supports `zix domain dns records resolve plan --profile FILE --original-plan-file ORIGINAL` followed by `dns records resolve apply --profile FILE --plan-file PLAN --journal-directory DIRECTORY [-y|--yes]` (zix >=0.5.0); without `--yes`, confirm with y/yes. Save the returned LocalPlan envelope as a private file.
+Since native 0.3.2, the extension supports `zix domain dns records resolve plan --profile FILE --original-plan-file ORIGINAL` followed by `dns records resolve apply --profile FILE --plan-file PLAN --journal-directory DIRECTORY [-y|--yes]` (zix >=0.5.0); without `--yes`, confirm with y/yes. Save the returned LocalPlan envelope as a private file.
 
 This local-only resolution accepts only the observed loss of priority 0 from an MX line added by the original acknowledged DNS write. It verifies the original private plan, profile, permanent attempt, unknown readback-mismatch receipt, and active domain lock, then independently reads the complete zone in both phases. Any other difference is refused. The immutable resolution and archived lock preserve the original unknown result and prohibit replay. No provider write occurs during resolution. A subsequent fresh `dns records plan/apply` can replace the exact malformed MX line with a nonzero priority; all other bytes, TTL and namespace remain fixed.
 
 The ValueDomain line editor rejects new zero-priority MX additions because the observed API cannot round-trip them safely. Historical plan inspection still recognizes the original plan. The general DNS import parser and other provider paths retain priority 0 support. A crash during local archival retains evidence and permits retrying only the same still-valid resolution plan, without repeating a remote write.
+
+## Reconcile an acknowledged Cloudflare write
+
+Since native 0.3.3, the extension extends the same `dns records resolve plan/apply` commands to
+Cloudflare profiles. Resolution requires an acknowledged record ID, the exact
+historical LocalPlan and profile, and the original permanent attempt, unknown
+receipt, and active domain lock. Both phases independently read two complete,
+identical inventories. The common record verifier checks the requested outcome,
+all unrelated records, zone identity, and update metadata. A missing provider
+acknowledgement, snapshot drift, wrong record ID, or expired resolution plan stops
+resolution. This does not extend the original write approval or retry a write.
+
+Only the local journal changes: the original attempt and unknown receipt remain,
+a resolution receipt is appended, and the active lock is archived before release.
+Keep using the original profile and journal. Do not delete a lock or switch
+journals to continue past an unknown outcome. Any later DNS change requires a
+new reviewed plan with a new complete baseline.

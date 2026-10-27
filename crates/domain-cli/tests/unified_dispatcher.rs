@@ -165,7 +165,7 @@ fn real_terminal_approval_and_profile_binding_stop_before_provider_access() {
             child.stdin.take().unwrap(),
             "{}",
             if accepted {
-                plan.digest()
+                "yes".to_string()
             } else {
                 String::new()
             }
