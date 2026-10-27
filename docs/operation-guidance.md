@@ -1,7 +1,7 @@
 # Domain operation guidance
 
 Use **MEANING → REQUIREMENTS → EVIDENCE → NEXT** before a remote request.
-Requires Zix CLI 0.6.0 and this provider's guided protocol v2 release.
+Requires Zix CLI 0.7.0 and this provider's guided protocol v2 release.
 
 ```sh
 zix prompt domain
@@ -27,3 +27,15 @@ Actual domains, accounts, addresses and credentials stay in private inputs.
 The shared [Zix guidance contract](https://github.com/zixcel/cli/blob/main/docs/operation-guidance.md)
 defines compatibility and LLM sequencing. Legacy plugins remain discoverable
 with their actual declared coverage; unavailable capabilities are not invented.
+
+## Small-context discovery
+
+Every registered operation has an explicit source-owned definition; missing operation coverage is a validation error. Select one provider and one operation instead of passing the full catalog to a model.
+
+```sh
+zix capabilities --compact --format json
+zix capabilities --namespace domain --compact --format json
+zix describe domain --operation OPERATION_ID --argument NAME=VALUE --compact --format json
+```
+
+Use an operation ID returned by the provider index. Supply only known argument names and values. The compact view retains missing inputs, typed requirements and conditional next actions. Missing selector-specific input stops execution before credential resolution or provider requests.
