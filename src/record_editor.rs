@@ -136,3 +136,23 @@ pub fn apply_reviewed(
 pub fn snapshot(scope: Scope, transport: &mut impl ReadTransport) -> Result<Snapshot> {
     record_snapshot::read(transport, &scope.validate()?)
 }
+
+/// Read-only verification of a historical acknowledged write. Does not renew its approval.
+pub fn verify_observed(plan: &RecordPlan, id: &str, after: &Snapshot) -> Result<()> {
+    if !crate::valid_id(id)
+        || plan.scope.clone().validate()? != plan.scope
+        || plan.expires_at != plan.created_at.saturating_add(300)
+        || plan.before.zone != after.zone
+        || plan.edit.id().is_some_and(|expected| expected != id)
+        || (plan.edit.id().is_none() && plan.before.records.iter().any(|v| v["id"] == id))
+    {
+        return Err(error("invalid_resolution_original"));
+    }
+    let normalized = plan.edit.clone().normalize(&plan.scope)?;
+    if serde_json::to_value(&normalized).ok() != serde_json::to_value(&plan.edit).ok() {
+        return Err(error("invalid_resolution_original"));
+    }
+    normalized.validate(&plan.before)?;
+    crate::dmarc::edit::validate(&plan.scope, &plan.before, &normalized)?;
+    record_execution::verify_snapshot(plan, id, after)
+}

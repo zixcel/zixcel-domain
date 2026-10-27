@@ -45,6 +45,13 @@ fn write(plan: &RecordPlan, transport: &mut impl RecordWriteTransport) -> Result
 }
 fn verify(plan: &RecordPlan, id: &str, transport: &mut impl RecordWriteTransport) -> Result<()> {
     let after = record_snapshot::read(transport, &plan.scope)?;
+    verify_snapshot(plan, id, &after)
+}
+pub(crate) fn verify_snapshot(
+    plan: &RecordPlan,
+    id: &str,
+    after: &record_snapshot::Snapshot,
+) -> Result<()> {
     let without = |records: &[Value]| {
         records
             .iter()

@@ -1,6 +1,7 @@
 //! Local reconciliation of a narrowly observed ValueDomain MX normalization.
 use super::*;
 use zixcel_domain::valuedomain::StoredDns;
+mod cloudflare;
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -78,6 +79,9 @@ pub(super) fn execute(
     profile_hash: String,
     deadline: Instant,
 ) -> Result<Value, Failure> {
+    if matches!(profile.target, Target::Cloudflare { .. }) {
+        return cloudflare::execute(r, profile, profile_hash, deadline);
+    }
     let arg = |k| {
         r.arguments
             .get(k)

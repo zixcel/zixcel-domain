@@ -174,3 +174,20 @@ Native 0.3.2 supports `zix domain dns records resolve plan --profile FILE --orig
 This local-only resolution accepts only the observed loss of priority 0 from an MX line added by the original acknowledged DNS write. It verifies the original private plan, profile, permanent attempt, unknown readback-mismatch receipt, and active domain lock, then independently reads the complete zone in both phases. Any other difference is refused. The immutable resolution and archived lock preserve the original unknown result and prohibit replay. No provider write occurs during resolution. A subsequent fresh `dns records plan/apply` can replace the exact malformed MX line with a nonzero priority; all other bytes, TTL and namespace remain fixed.
 
 The ValueDomain line editor rejects new zero-priority MX additions because the observed API cannot round-trip them safely. Historical plan inspection still recognizes the original plan. The general DNS import parser and other provider paths retain priority 0 support. A crash during local archival retains evidence and permits retrying only the same still-valid resolution plan, without repeating a remote write.
+
+## Reconcile an acknowledged Cloudflare write
+
+Native 0.3.3 extends the same `dns records resolve plan/apply` commands to
+Cloudflare profiles. Resolution requires an acknowledged record ID, the exact
+historical LocalPlan and profile, and the original permanent attempt, unknown
+receipt, and active domain lock. Both phases independently read two complete,
+identical inventories. The common record verifier checks the requested outcome,
+all unrelated records, zone identity, and update metadata. A missing provider
+acknowledgement, snapshot drift, wrong record ID, or expired resolution plan stops
+resolution. This does not extend the original write approval or retry a write.
+
+Only the local journal changes: the original attempt and unknown receipt remain,
+a resolution receipt is appended, and the active lock is archived before release.
+Keep using the original profile and journal. Do not delete a lock or switch
+journals to continue past an unknown outcome. Any later DNS change requires a
+new reviewed plan with a new complete baseline.
